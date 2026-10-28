@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pixabay 이미지 슬라이드</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px 16px; font-family: system-ui, sans-serif; background: #f0f9ff; color: #0c3a52; }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h1 { margin: 0 0 16px; font-size: 24px; text-align: center; }
+    form { display: grid; gap: 8px; margin-bottom: 16px; }
+    .row { display: flex; gap: 8px; }
+    input { flex: 1; min-width: 0; padding: 10px 14px; font-size: 16px; border: 2px solid #bae6fd; border-radius: 10px; }
+    button { padding: 10px 18px; font-size: 16px; border: none; border-radius: 10px; background: #0284c7; color: #fff; cursor: pointer; }
+    button:hover { background: #0369a1; }
+    #msg { min-height: 24px; text-align: center; color: #b91c1c; font-size: 14px; }
+
+    .slider { position: relative; background: #000; border-radius: 16px; overflow: hidden; aspect-ratio: 4 / 3; display: none; }
+    .slider img { width: 100%; height: 100%; object-fit: contain; }
+    .arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; padding: 0; border-radius: 50%; background: rgba(0,0,0,.5); font-size: 22px; }
+    .arrow:hover { background: rgba(0,0,0,.75); }
+    #prev { left: 10px; }
+    #next { right: 10px; }
+    .counter { position: absolute; bottom: 10px; right: 12px; padding: 2px 10px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; font-size: 13px; }
+    .caption { margin-top: 8px; text-align: center; font-size: 13px; color: #475569; }
+    .caption a { color: #0369a1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🖼️ Pixabay 이미지 슬라이드</h1>
+
+    <form id="form">
+      <input id="key" type="password" placeholder="Pixabay API 키" autocomplete="off" required>
+      <div class="row">
+        <input id="q" type="text" placeholder="검색어 (예: 제주, 귤, 바다)" required>
+        <button type="submit">검색</button>
+      </div>
+    </form>
+    <div id="msg"></div>
+
+    <div class="slider" id="slider">
+      <img id="photo" alt="">
+      <button type="button" class="arrow" id="prev" aria-label="이전">◀</button>
+      <button type="button" class="arrow" id="next" aria-label="다음">▶</button>
+      <span class="counter" id="counter"></span>
+    </div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let hits = [];
+    let index = 0;
+
+    $('key').value = sessionStorage.getItem('pixabayKey') || '';
+
+    $('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const key = $('key').value.trim();
+      const q = $('q').value.trim();
+      $('msg').textContent = '불러오는 중...';
+      try {
+        const url = `https://pixabay.com/api/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(q)}&image_type=photo&per_page=10`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(res.status === 400 ? 'API 키가 올바르지 않아요.' : `오류 (${res.status})`);
+        const data = await res.json();
+        hits = data.hits;
+        if (!hits.length) throw new Error('검색 결과가 없어요.');
+        sessionStorage.setItem('pixabayKey', key);
+        index = 0;
+        $('msg').textContent = '';
+        $('slider').style.display = 'block';
+        show();
+      } catch (err) {
+        $('msg').textContent = err.message;
+      }
+    });
+
+    function show() {
+      const h = hits[index];
+      $('photo').src = h.largeImageURL;
+      $('photo').alt = h.tags;
+      $('counter').textContent = `${index + 1} / ${hits.length}`;
+      $('caption').innerHTML = `📷 <a href="${h.pageURL}" target="_blank" rel="noopener">${h.user}</a> · Pixabay`;
+    }
+    $('prev').addEventListener('click', () => { index = (index - 1 + hits.length) % hits.length; show(); });
+    $('next').addEventListener('click', () => { index = (index + 1) % hits.length; show(); });
+    document.addEventListener('keydown', (e) => {
+      if (!hits.length || e.target.tagName === 'INPUT') return;
+      if (e.key === 'ArrowLeft') $('prev').click();
+      if (e.key === 'ArrowRight') $('next').click();
+    });
+  </script>
+</body>
+</html>

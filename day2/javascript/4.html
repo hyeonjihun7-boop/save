@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script>
+        function plus(a,b){
+            return a+b
+        }
+        function minus(a,b){
+            return a-b
+        }
+        function multiply(a,b){
+            return a*b
+        }
+        function dividide(a,b){
+            return a/b
+        }
+        function reminder(a,b){
+            return a%b
+        }
+    window.addEventListener('DOMContentLoaded', function () {
+        document.querySelector('button#a').addEventListener('mouseover',() =>
+            console. log(plus(4, 7))
+        );
+         document.querySelector('button#b').addEventListener('mouseover',() =>
+            console. log(minus(4, 7))
+        );
+          document.querySelector('button#c').addEventListener('mouseover',() =>
+            console. log(multiply(4, 7))
+        );
+         document.querySelector('button#d').addEventListener('mouseover',() =>
+            console. log(dividide(4, 7))
+        );
+        document.querySelector('button#e').addEventListener('mouseover',() =>
+            console. log(reminder(4, 7))
+        );
+
+    }
+)
+
+
+    </script>
+</head>
+<body>
+    안녕하세요
+    <h1>
+        반갑습니다
+    </h1>
+    <h2>
+        반갑습니다
+    </h2>
+    <button id="a">덧셈</button>
+    <button id="b">뺄셈</button>
+    <button id="c">곱하기</button>
+    <button id="d">나누기</button>
+    <button id="e">나머지</button>
+</body>
+</html>

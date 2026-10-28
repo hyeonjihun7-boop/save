@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제주 여행 에이전트</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; height: 100vh; display: flex; flex-direction: column; font-family: system-ui, sans-serif; background: #f0f9ff; color: #1e293b; }
+        header { padding: 14px 16px; text-align: center; font-weight: 700; color: #fff; background: linear-gradient(135deg, #38bdf8, #0369a1); }
+        main { flex: 1; display: flex; min-height: 0; }
+        #left { width: 420px; display: flex; flex-direction: column; border-right: 1px solid #bae6fd; min-height: 0; }
+        #chat { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+        .bubble { max-width: 90%; padding: 10px 14px; border-radius: 16px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+        .me { align-self: flex-end; background: #0369a1; color: #fff; border-bottom-right-radius: 4px; }
+        .bot { align-self: flex-start; background: #fff; border: 1px solid #bae6fd; border-bottom-left-radius: 4px; }
+        .step { align-self: flex-start; font-size: 12px; color: #475569; background: #e0f2fe; border-radius: 999px; padding: 3px 10px; }
+        .cards { display: flex; flex-direction: column; gap: 8px; }
+        .card { display: flex; gap: 10px; align-items: center; background: #fff; border: 1px solid #bae6fd; border-radius: 12px; padding: 8px; font-size: 14px; }
+        .card img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; flex: none; }
+        img.pop { width: 100%; max-height: 120px; object-fit: cover; border-radius: 6px; margin-bottom: 4px; }
+        #examples { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 8px; }
+        #examples button { font-size: 12px; background: #fff; border: 1px solid #7dd3fc; color: #0369a1; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+        form { display: flex; gap: 8px; padding: 10px 14px; }
+        input { flex: 1; min-width: 0; padding: 12px 14px; font-size: 16px; border: 2px solid #bae6fd; border-radius: 12px; }
+        form button { padding: 0 18px; font-size: 16px; color: #fff; background: #0369a1; border: 0; border-radius: 12px; cursor: pointer; }
+        button:disabled { opacity: .5; cursor: default; }
+        #map { flex: 1; }
+        @media (max-width: 800px) {
+            main { flex-direction: column-reverse; }
+            #left { width: auto; flex: 1; border-right: 0; }
+            #map { flex: none; height: 38vh; }
+        }
+    </style>
+</head>
+<body>
+    <header>🌴 제주 여행 에이전트 — 날씨와 장소를 직접 확인하고 추천해요</header>
+    <main>
+        <div id="left">
+            <div id="chat"></div>
+            <div id="examples"></div>
+            <form id="form">
+                <input id="q" placeholder="예: 내일 서귀포에서 뭐 하지?" autocomplete="off" maxlength="200">
+                <button id="send">보내기</button>
+            </form>
+        </div>
+        <div id="map"></div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        const $ = (id) => document.getElementById(id)
+        const chat = $('chat')
+        const history = []   // {role, content} 텍스트만 보관
+
+        const map = L.map('map').setView([33.38, 126.55], 9)
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map)
+        const markers = L.layerGroup().addTo(map)
+
+        function add(cls, text) {
+            const d = document.createElement('div')
+            d.className = cls
+            d.textContent = text
+            chat.appendChild(d)
+            chat.scrollTop = chat.scrollHeight
+            return d
+        }
+
+        // 장소 이름으로 위키백과 대표 이미지를 찾는다 (키 불필요)
+        const thumbs = {}
+        function thumb(name) {
+            thumbs[name] = thumbs[name] || fetch('https://ko.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(name))
+                .then((r) => r.ok ? r.json() : null)
+                .then((d) => d && d.thumbnail ? d.thumbnail.source : null)
+                .catch(() => null)
+            return thumbs[name]
+        }
+
+        function showSpots(spots) {
+            markers.clearLayers()
+            const pts = []
+            const cards = document.createElement('div')
+            cards.className = 'cards'
+            chat.appendChild(cards)
+            for (const s of spots) {
+                const label = s.name + ' (' + (s.indoor ? '실내' : '야외') + ')'
+                const popup = document.createElement('div')
+                const text = document.createElement('div')
+                text.textContent = label + ' - ' + s.desc
+                popup.appendChild(text)
+
+                const card = document.createElement('div')
+                card.className = 'card'
+                const info = document.createElement('div')
+                info.textContent = label + ' - ' + s.desc
+                card.appendChild(info)
+                cards.appendChild(card)
+
+                thumb(s.name).then((src) => {
+                    if (!src) return
+                    const a = document.createElement('img')
+                    a.src = src
+                    a.alt = s.name
+                    card.prepend(a)
+                    const b = a.cloneNode()
+                    b.className = 'pop'
+                    popup.prepend(b)
+                })
+
+                if (s.lat !== undefined) {
+                    L.marker([s.lat, s.lon]).bindPopup(popup, { minWidth: 160 }).addTo(markers)
+                    pts.push([s.lat, s.lon])
+                }
+            }
+            chat.scrollTop = chat.scrollHeight
+            if (pts.length) map.fitBounds(pts, { padding: [40, 40], maxZoom: 12 })
+        }
+
+        // 화면에서도 Gemini 원본 JSON 을 펼쳐 볼 수 있게 한다
+        function showRaw(raw) {
+            if (!raw || !raw.length) return
+            const d = document.createElement('details')
+            d.className = 'step'
+            const s = document.createElement('summary')
+            s.textContent = 'Gemini 원본 응답 보기 (' + raw.length + '회 호출)'
+            const pre = document.createElement('pre')
+            pre.style.cssText = 'max-height:240px;overflow:auto;white-space:pre-wrap;font-size:11px'
+            pre.textContent = JSON.stringify(raw, null, 2)
+            d.append(s, pre)
+            chat.appendChild(d)
+        }
+
+        async function ask(text) {
+            add('bubble me', text)
+            history.push({ role: 'user', content: text })
+            $('send').disabled = true
+            const wait = add('bubble bot', '생각하는 중...')
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ messages: history })
+                })
+                const data = await res.json()
+                // 개발자 도구(F12) → Console 에서 펼쳐 볼 수 있다
+                console.log('서버 응답 HTTP', res.status, data)
+                console.log('Gemini 원본 요청/응답 (가공 없음)', data.raw)
+                if (data.detail) console.error('오류 원인:', data.detail)
+                wait.remove()
+                showRaw(data.raw)
+                if (!res.ok) { add('bubble bot', data.error || '오류가 났어요.'); history.pop(); return }
+                for (const s of data.steps) {
+                    const args = Object.values(s.input).join(', ')
+                    add('step', '🔧 ' + s.tool + '(' + args + ')')
+                }
+                add('bubble bot', data.reply)
+                history.push({ role: 'assistant', content: data.reply })
+                if (data.spots.length) showSpots(data.spots)
+            } catch (e) {
+                console.error('서버 연결 실패:', e)
+                wait.remove()
+                add('bubble bot', '서버에 연결하지 못했어요.')
+                history.pop()
+            } finally {
+                $('send').disabled = false
+            }
+        }
+
+        $('form').addEventListener('submit', (e) => {
+            e.preventDefault()
+            const text = $('q').value.trim()
+            if (!text) return
+            $('q').value = ''
+            ask(text)
+        })
+
+        for (const t of ['오늘 제주시에서 갈 만한 곳 추천해줘', '내일 비 오면 서귀포에서 어디 가지?', '동쪽 야외 코스 알려줘']) {
+            const b = document.createElement('button')
+            b.type = 'button'
+            b.textContent = t
+            b.onclick = () => ask(t)
+            $('examples').appendChild(b)
+        }
+
+        add('bubble bot', '안녕하세요! 지역과 날짜를 말해 주시면 날씨를 확인하고 어울리는 관광지를 골라 드릴게요.')
+    </script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>제주 특산물 이야기</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #fff7ed;
+      color: #3b2a1a;
+      line-height: 1.7;
+    }
+    .page { max-width: 960px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+
+    header {
+      text-align: center;
+      padding: 36px 16px;
+      color: #fff;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #fb923c, #ea580c);
+    }
+    header h1 { margin: 0 0 6px; font-size: 32px; }
+    header p { margin: 0; opacity: .95; }
+
+    nav { background: #7c2d12; border-radius: 12px; overflow: hidden; }
+    nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; }
+    nav a { display: block; padding: 14px 22px; color: #fed7aa; text-decoration: none; font-weight: 600; }
+    nav a:hover { background: #9a3412; color: #fff; }
+
+    .middle { display: grid; grid-template-columns: 1fr 280px; gap: 16px; }
+    .left { display: grid; gap: 16px; align-content: start; }
+    section, article, aside {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 14px rgba(124, 45, 18, .12);
+    }
+    h2 { margin: 0 0 12px; font-size: 22px; color: #c2410c; }
+    h3 { margin: 0 0 4px; font-size: 17px; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .item { padding: 16px; border-radius: 12px; background: #ffedd5; text-align: center; }
+    .item .emoji { font-size: 40px; }
+    .item p { margin: 4px 0 0; font-size: 14px; }
+
+    article p { margin: 0 0 10px; }
+    .tag { display: inline-block; margin: 0 6px 6px 0; padding: 2px 10px; border-radius: 999px; background: #fed7aa; color: #9a3412; font-size: 13px; }
+
+    aside h2 { font-size: 18px; }
+    aside ul { margin: 0 0 20px; padding-left: 20px; font-size: 14px; }
+    aside .box { padding: 14px; border-radius: 12px; background: #ecfeff; color: #155e75; font-size: 14px; }
+
+    footer {
+      text-align: center;
+      padding: 20px 16px;
+      border-radius: 12px;
+      background: #7c2d12;
+      color: #fed7aa;
+      font-size: 14px;
+    }
+
+    .search { display: flex; gap: 8px; margin-bottom: 8px; }
+    .search input { flex: 1; min-width: 0; padding: 10px 14px; font-size: 16px; border: 2px solid #fed7aa; border-radius: 10px; }
+    .search button { padding: 10px 18px; font-size: 16px; border: none; border-radius: 10px; background: #ea580c; color: #fff; cursor: pointer; }
+    .search button:hover { background: #c2410c; }
+    .msg { min-height: 22px; margin: 0 0 8px; color: #b91c1c; font-size: 14px; }
+    .slider { position: relative; display: none; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 12px; background: #000; }
+    .slider img { width: 100%; height: 100%; object-fit: contain; }
+    .arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 42px; height: 42px; padding: 0; border: none; border-radius: 50%; background: rgba(0,0,0,.5); color: #fff; font-size: 20px; cursor: pointer; }
+    .arrow:hover { background: rgba(0,0,0,.75); }
+    #prev { left: 10px; }
+    #next { right: 10px; }
+    .counter { position: absolute; right: 12px; bottom: 10px; padding: 2px 10px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; font-size: 13px; }
+    .caption { margin: 8px 0 0; text-align: center; font-size: 13px; color: #78716c; }
+    .caption a { color: #c2410c; }
+
+    .chat-fab { position: fixed; right: 20px; bottom: 20px; z-index: 20; width: 60px; height: 60px; padding: 0; border: none; border-radius: 50%; background: #ea580c; color: #fff; font-size: 28px; cursor: pointer; box-shadow: 0 6px 18px rgba(124, 45, 18, .35); }
+    .chat-fab:hover { background: #c2410c; }
+    .chat-panel { position: fixed; right: 20px; bottom: 92px; z-index: 20; width: min(380px, calc(100vw - 40px)); height: min(560px, calc(100vh - 120px)); overflow: hidden; border-radius: 16px; background: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); }
+    .chat-panel[hidden] { display: none; }
+    .chat-panel iframe { width: 100%; height: 100%; border: 0; }
+
+    .hero-btn-wrap { display: flex; justify-content: center; padding: 8px 0; }
+    .hero-btn { width: 180px; height: 180px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; text-decoration: none; font-size: 20px; font-weight: 700; line-height: 1.3; color: #fff; background: linear-gradient(135deg, #3b82f6, #1e3a8a); box-shadow: 0 10px 24px rgba(30, 58, 138, .35); transition: transform .2s, box-shadow .2s; }
+    .hero-btn:hover, .hero-btn:focus-visible { transform: scale(1.06); box-shadow: 0 14px 30px rgba(30, 58, 138, .45); outline: none; }
+    .hero-btn:active { transform: scale(.97); }
+    .hero-emoji { font-size: 48px; line-height: 1; }
+
+    img, iframe { max-width: 100%; }
+
+    /* 동적 효과 */
+    html { scroll-behavior: smooth; scroll-padding-top: 12px; }
+    .item { cursor: pointer; transition: transform .2s, box-shadow .2s, background .2s; opacity: 0; transform: translateY(12px); animation: rise .5s ease forwards; }
+    .item:hover { transform: translateY(-4px); box-shadow: 0 6px 14px rgba(124, 45, 18, .2); }
+    .item.on { background: #fdba74; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+    .detail { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #fff7ed; font-size: 14px; }
+    nav a.active { background: #9a3412; color: #fff; }
+    .reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s, transform .6s; }
+    .reveal.show { opacity: 1; transform: none; }
+
+    /* 태블릿·모바일 */
+    @media (max-width: 720px) {
+      .page { padding: 10px; gap: 12px; }
+      header { padding: 24px 12px; }
+      header h1 { font-size: 24px; }
+      header p { font-size: 14px; }
+      nav ul { display: grid; grid-template-columns: 1fr 1fr; }
+      nav a { padding: 12px 8px; text-align: center; font-size: 14px; }
+      .middle { grid-template-columns: 1fr; gap: 12px; }
+      .left { gap: 12px; }
+      section, article, aside { padding: 16px; }
+      h2 { font-size: 19px; }
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      .item .emoji { font-size: 32px; }
+      .search { flex-direction: column; }
+      .search button { width: 100%; }
+      .chat-fab { right: 14px; bottom: 14px; width: 54px; height: 54px; font-size: 24px; }
+      .chat-panel { right: 0; bottom: 0; left: 0; width: 100%; height: 85vh; border-radius: 16px 16px 0 0; }
+      .chat-fab { z-index: 30; }
+      .chat-open .chat-fab { top: calc(15vh - 62px); bottom: auto; width: 44px; height: 44px; font-size: 18px; }
+    }
+
+    /* 아주 작은 화면 */
+    @media (max-width: 380px) {
+      header h1 { font-size: 21px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* 큰 PC 화면 */
+    @media (min-width: 1100px) {
+      .page { max-width: 1080px; padding: 24px; gap: 20px; }
+      .middle { grid-template-columns: 1fr 320px; gap: 20px; }
+      header h1 { font-size: 38px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header id="home">
+      <h1>🍊 제주 특산물 이야기 🌴</h1>
+      <p>바람과 햇살, 바다가 키운 제주의 맛을 만나 보세요</p>
+    </header>
+
+    <nav>
+      <ul>
+        <li><a href="#home">🏠 홈</a></li>
+        <li><a href="#products">🧺 대표 특산물</a></li>
+        <li><a href="#story">📖 이야기</a></li>
+        <li><a href="#tips">💡 구매 팁</a></li>
+      </ul>
+    </nav>
+
+    <div class="hero-btn-wrap">
+      <a href="reactive.html" class="hero-btn" aria-label="생활 정보 열기">
+        <span class="hero-emoji">📌</span>
+        <span>생활 정보<br>열기</span>
+      </a>
+    </div>
+
+    <div class="middle">
+      <div class="left">
+        <section id="products">
+          <h2>🧺 대표 특산물</h2>
+          <div class="grid" id="productGrid"></div>
+          <p class="detail" id="detail">카드를 눌러 보세요 👆</p>
+        </section>
+
+        <section id="gallery">
+          <h2>🖼️ 제주 사진 슬라이드</h2>
+          <form id="searchForm" class="search">
+            <input id="q" type="text" placeholder="검색어 (예: 제주, 귤, 바다)" required>
+            <button type="submit">검색</button>
+          </form>
+          <p id="msg" class="msg"></p>
+          <div id="slider" class="slider">
+            <img id="photo" alt="">
+            <button type="button" class="arrow" id="prev" aria-label="이전">◀</button>
+            <button type="button" class="arrow" id="next" aria-label="다음">▶</button>
+            <span class="counter" id="counter"></span>
+          </div>
+          <p id="caption" class="caption"></p>
+        </section>
+
+        <article id="story">
+          <h2>📖 제주 감귤 이야기</h2>
+          <p>따뜻한 기후와 화산토 덕분에 제주는 감귤이 자라기 좋은 땅이에요. 노지 감귤은 보통 늦가을부터 겨울에 제철을 맞고, 한라봉 같은 만감류는 겨울에서 봄까지 이어집니다.</p>
+          <p>햇살을 가득 받고 바닷바람을 맞으며 자란 귤은 껍질째 향이 진하고 맛이 깊어요. 선물용으로도, 집에서 간식으로도 사랑받습니다.</p>
+          <span class="tag">#제철과일</span><span class="tag">#비타민</span><span class="tag">#선물추천</span><span class="tag">#제주산</span>
+        </article>
+      </div>
+
+      <aside id="tips">
+        <h2>💡 구매 팁</h2>
+        <ul>
+          <li>🗓️ 제철을 확인하세요.</li>
+          <li>🏷️ 원산지 표시를 살펴보세요.</li>
+          <li>📦 산지 직송은 도착 시기를 확인하세요.</li>
+          <li>🧊 과일은 서늘한 곳에 보관하세요.</li>
+        </ul>
+        <h2>🌦️ 여행 + 체험</h2>
+        <div class="box">제주에 가면 감귤 따기 체험과 시장 먹거리 투어도 함께 즐겨 보세요! 🍊</div>
+      </aside>
+    </div>
+
+    <footer>
+      © 2026 제주 특산물 이야기 · 🌊 제주의 맛을 전합니다
+    </footer>
+  </div>
+
+  <button type="button" id="chatBtn" class="chat-fab" aria-label="채팅 열기">💬</button>
+  <div id="chatPanel" class="chat-panel" hidden>
+    <iframe id="chatFrame" title="제주 특산물 에이전트 채팅"></iframe>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let hits = [];
+    let index = 0;
+
+    $('searchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('msg').textContent = '불러오는 중...';
+      try {
+        const res = await fetch('/api/pixabay?q=' + encodeURIComponent($('q').value.trim()));
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `오류 (${res.status})`);
+        if (!data.hits.length) throw new Error('검색 결과가 없어요.');
+        hits = data.hits;
+        index = 0;
+        $('msg').textContent = '';
+        $('slider').style.display = 'block';
+        show();
+        play();
+      } catch (err) {
+        $('msg').textContent = err.message;
+      }
+    });
+
+    function show() {
+      const h = hits[index];
+      $('photo').src = h.url;
+      $('photo').alt = h.tags;
+      $('counter').textContent = `${index + 1} / ${hits.length}`;
+      $('caption').innerHTML = `📷 <a href="${h.pageURL}" target="_blank" rel="noopener">${h.user}</a> · Pixabay`;
+    }
+    // 특산물 카드를 데이터로 동적 생성
+    const products = [
+      { e: '🍊', n: '감귤', s: '새콤달콤한 제주의 상징', d: '노지 감귤은 늦가을부터 겨울이 제철이에요. 비타민이 풍부해 간식으로 좋아요.' },
+      { e: '🍋', n: '한라봉', s: '향긋하고 당도 높은 만감류', d: '겨울에서 봄까지 맛볼 수 있고, 향이 진해 선물용으로 인기가 많아요.' },
+      { e: '🐖', n: '흑돼지', s: '쫄깃하고 고소한 맛', d: '숯불구이로 즐기는 제주 대표 음식이에요. 멜젓에 찍어 먹어 보세요.' },
+      { e: '🐟', n: '갈치 · 옥돔', s: '바다가 준 담백한 선물', d: '갈치는 구이와 조림, 옥돔은 구이와 미역국으로 많이 먹어요.' },
+      { e: '🍵', n: '녹차', s: '서귀포 차밭의 은은한 향', d: '차밭 산책과 차 만들기 체험도 함께 즐길 수 있어요.' },
+      { e: '🥔', n: '제주 채소', s: '무, 당근, 감자, 양배추', d: '제주 바람과 햇살로 자란 신선한 채소예요.' },
+    ];
+    const grid = $('productGrid');
+    products.forEach((p, i) => {
+      const card = document.createElement('div');
+      card.className = 'item';
+      card.style.animationDelay = `${i * 80}ms`;
+      card.innerHTML = `<div class="emoji">${p.e}</div><h3>${p.n}</h3><p>${p.s}</p>`;
+      card.addEventListener('click', () => {
+        grid.querySelectorAll('.item').forEach((c) => c.classList.remove('on'));
+        card.classList.add('on');
+        $('detail').textContent = `${p.e} ${p.n} — ${p.d}`;
+      });
+      grid.appendChild(card);
+    });
+
+    // 스크롤 시 영역 등장 + 현재 위치에 맞게 메뉴 강조
+    document.querySelectorAll('section, article, aside').forEach((el) => el.classList.add('reveal'));
+    const revealer = new IntersectionObserver((entries) => {
+      entries.forEach((en) => { if (en.isIntersecting) { en.target.classList.add('show'); revealer.unobserve(en.target); } });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach((el) => revealer.observe(el));
+
+    const links = [...document.querySelectorAll('nav a')];
+    const spy = new IntersectionObserver((entries) => {
+      entries.forEach((en) => {
+        if (en.isIntersecting) links.forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#' + en.target.id));
+      });
+    }, { rootMargin: '-40% 0px -55% 0px' });
+    links.forEach((a) => { const t = document.querySelector(a.getAttribute('href')); if (t) spy.observe(t); });
+
+    $('chatBtn').addEventListener('click', () => {
+      const panel = $('chatPanel');
+      const frame = $('chatFrame');
+      if (!frame.src) frame.src = 'agent.html';
+      panel.hidden = !panel.hidden;
+      document.body.classList.toggle('chat-open', !panel.hidden);
+      $('chatBtn').textContent = panel.hidden ? '💬' : '✕';
+    });
+
+    let timer = null;
+    function play() {
+      clearInterval(timer);
+      timer = setInterval(() => { index = (index + 1) % hits.length; show(); }, 3000);
+    }
+    $('prev').addEventListener('click', () => { index = (index - 1 + hits.length) % hits.length; show(); play(); });
+    $('next').addEventListener('click', () => { index = (index + 1) % hits.length; show(); play(); });
+  </script>
+</body>
+</html>

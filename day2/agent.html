@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>제주 특산물 에이전트</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: system-ui, sans-serif;
+      background: #fff7ed;
+      color: #3b2a1a;
+    }
+    header {
+      padding: 16px;
+      text-align: center;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #fb923c, #ea580c);
+    }
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 16px;
+      max-width: 640px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .bubble {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .me { align-self: flex-end; background: #ea580c; color: #fff; border-bottom-right-radius: 4px; }
+    .bot { align-self: flex-start; background: #fff; border: 1px solid #fed7aa; border-bottom-left-radius: 4px; }
+    form {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      max-width: 640px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 12px 14px;
+      font-size: 16px;
+      border: 2px solid #fed7aa;
+      border-radius: 12px;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 12px;
+      background: #ea580c;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover { background: #c2410c; }
+    .fake { margin: 0; padding: 0 16px 10px; text-align: center; font-size: 11px; color: #a8a29e; }
+  </style>
+</head>
+<body>
+  <header>🍊 제주 특산물 에이전트</header>
+
+  <div id="chat">
+    <div class="bubble bot">안녕하세요! 제주 특산물을 알려 드리는 에이전트예요 🍊 무엇이 궁금하세요?</div>
+  </div>
+
+  <form id="form">
+    <input id="input" type="text" placeholder="메시지를 입력하세요" autocomplete="off">
+    <button type="submit">보내기</button>
+  </form>
+
+  <p class="fake">※ 이 답변은 가짜(미리 정해 둔 답)예요. 실제 AI가 아닙니다.</p>
+
+  <script>
+    const replies = [
+      '안녕하세요! 제주 특산물이 궁금하신가요? 🍊 귤, 한라봉, 흑돼지 중에 어떤 게 궁금하세요?',
+      '겨울에 가신다면 한라봉을 추천해요! 향이 진하고 달콤해서 선물로도 좋아요 🍋',
+      '아직 공부 중이에요! 5일차에 진짜로 알아볼게요.',
+    ];
+    let turn = 0;
+
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('input');
+
+    function addBubble(text, who) {
+      const div = document.createElement('div');
+      div.className = 'bubble ' + who;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    document.getElementById('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      addBubble(text, 'me');
+      input.value = '';
+      const reply = replies[turn % replies.length];
+      turn++;
+      setTimeout(() => addBubble(reply, 'bot'), 1000);
+    });
+  </script>
+</body>
+</html>

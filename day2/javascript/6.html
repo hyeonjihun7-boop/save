@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script>
+        // 버튼 id → 계산 함수
+        const ops = {
+            a: (a, b) => a + b,
+            b: (a, b) => a - b,
+            c: (a, b) => a * b,
+            d: (a, b) => a / b,
+        }
+
+    window.addEventListener('DOMContentLoaded', function () {
+        for (const id in ops) {
+            document.querySelector('button#' + id).addEventListener('click', () => {
+                const x = Number(document.querySelector('#x').value)
+                const y = Number(document.querySelector('#y').value)
+                document.querySelector('#result').textContent = ops[id](x, y)
+            })
+        }
+    })
+    </script>
+</head>
+<body>
+    안녕하세요
+    <h1>
+        반갑습니다
+    </h1>
+    <h2>
+        반갑습니다
+    </h2>
+    <input type="number" id="x" placeholder="첫 번째 숫자">
+    <input type="number" id="y" placeholder="두 번째 숫자">
+    <button id="a">더하기</button>
+    <button id="b">빼기</button>
+    <button id="c">곱하기</button>
+    <button id="d">나누기</button>
+    <h2>결과: <span id="result"></span></h2>
+</body>
+</html>
