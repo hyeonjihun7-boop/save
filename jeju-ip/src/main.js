@@ -1,6 +1,7 @@
 import './style.css';
 import { supabase, hasSupabase, authError } from './supabase.js';
 import { searchImages, getImage } from './api.js';
+import { renderStats } from './stats.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -186,7 +187,8 @@ $('#viewBody').addEventListener('click', e => { const heart = e.target.closest('
 /* ---------- 탭 전환 ---------- */
 function switchView(v) {
   state.view = v;
-  ['home', 'favs', 'shop', 'cart'].forEach(name => $(`#${name}View`).classList.toggle('hidden', v !== name));
+  ['home', 'favs', 'stats', 'shop', 'cart'].forEach(name => $(`#${name}View`).classList.toggle('hidden', v !== name));
+  if (v === 'stats') renderStats();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
   if (v === 'favs') renderFavs();
   if (v === 'shop') renderShop();

@@ -25,6 +25,7 @@ jeju-ip/
 | `VITE_SUPABASE_URL` | Supabase → Project Settings → API → **Project URL** | 공개돼도 OK | 브라우저 |
 | `VITE_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → **anon public key** (신형 UI는 *publishable key*) | 공개돼도 OK (RLS가 보호) | 브라우저 |
 | `PIXABAY_API_KEY` | https://pixabay.com/api/docs/ (로그인 시 표시) | **비공개** | 서버리스 함수만 |
+| `DATA_GO_KR_KEY` | data.go.kr → 마이페이지 → 데이터 요청 → 제공신청 → 해당 API 의 **일반 인증키** | **비공개** | 서버리스 함수만 (`api/visitors.js`) |
 
 > ⚠️ `service_role` / `secret` 키는 절대 쓰지 마세요. `VITE_` 로 시작하는 변수는 브라우저 코드에 그대로 포함됩니다.
 > `PIXABAY_API_KEY` 에는 `VITE_` 를 **붙이지 않습니다** (붙이면 키가 공개됨).
@@ -87,6 +88,7 @@ git push
    | `VITE_SUPABASE_URL` | Supabase Project URL |
    | `VITE_SUPABASE_ANON_KEY` | Supabase anon(publishable) key |
    | `PIXABAY_API_KEY` | Pixabay API key |
+   | `DATA_GO_KR_KEY` | 공공데이터포털 일반 인증키 (📊 관광 통계 탭용) |
 
 4. **Deploy** → 완료되면 `https://<프로젝트>.vercel.app` 주소가 생깁니다.
 5. 환경변수를 나중에 바꿨다면 **Deployments → … → Redeploy** 해야 반영됩니다.

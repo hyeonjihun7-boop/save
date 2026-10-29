@@ -134,6 +134,51 @@ button { font: inherit; cursor: pointer; }
   .tab { white-space: nowrap; }
 }
 
+/* 관광 통계 */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 6px 0 18px; }
+.scard { background: var(--card); border-radius: 14px; padding: 14px 16px; box-shadow: 0 1px 6px rgba(30, 20, 0, .1); display: flex; flex-direction: column; gap: 2px; }
+.scard small { color: var(--sub); font-size: 12.5px; }
+.scard b { font-size: 21px; line-height: 1.3; }
+.scard em { font-style: normal; font-size: 13px; color: var(--sub); }
+.scard em.up { color: #1c8c4a; } .scard em.down { color: #c0392b; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.seg2 { display: inline-flex; background: #f1e9d8; border-radius: 999px; padding: 3px; }
+.seg2 button { border: 0; background: none; padding: 7px 14px; border-radius: 999px; color: var(--sub); font-weight: 500; }
+.seg2 button.on { background: #fff; color: var(--ink); font-weight: 700; box-shadow: 0 1px 4px rgba(0, 0, 0, .15); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; }
+.lg { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 12px; font-size: 13.5px; }
+.lg i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.lg.off { opacity: .4; text-decoration: line-through; }
+.chartwrap { position: relative; background: var(--card); border-radius: 16px; padding: 10px 6px 4px; box-shadow: 0 1px 6px rgba(30, 20, 0, .1); touch-action: pan-y; }
+#statChart { width: 100%; height: auto; display: block; }
+#statChart .grid { stroke: #e9dfcb; stroke-width: 1; }
+#statChart .ax { fill: #7b8590; font-size: 12px; }
+#statChart .cursor { stroke: #2b2d33; stroke-width: 1; stroke-dasharray: 4 3; opacity: .55; }
+.tip { position: absolute; top: 12px; z-index: 3; min-width: 190px; background: rgba(25, 32, 38, .94); color: #fff; border-radius: 10px; padding: 9px 12px; font-size: 13px; pointer-events: none; box-shadow: 0 6px 18px rgba(0, 0, 0, .3); }
+.tip b { display: block; margin-bottom: 4px; }
+.tip div { display: flex; align-items: center; gap: 7px; line-height: 1.7; }
+.tip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.tip span { margin-left: auto; font-variant-numeric: tabular-nums; }
+.two { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; margin-top: 16px; }
+.panel { background: var(--card); border-radius: 16px; padding: 14px 16px; box-shadow: 0 1px 6px rgba(30, 20, 0, .1); min-width: 0; }
+.panel h3 { margin: 0 0 10px; font-size: 16px; }
+.rk { display: grid; grid-template-columns: 22px 1fr; gap: 2px 8px; align-items: center; margin-bottom: 11px; }
+.rk .no { grid-row: span 2; font-weight: 700; color: var(--sub); text-align: center; }
+.rk .nm { font-weight: 500; }
+.rk .bar { height: 8px; background: #efe6d3; border-radius: 4px; overflow: hidden; grid-column: 2; }
+.rk .bar i { display: block; height: 100%; border-radius: 4px; }
+.rk .val { grid-column: 2; font-size: 13px; color: var(--sub); }
+.rk .val small { color: #b0742a; }
+.tablewrap { overflow-x: auto; }
+.tablewrap table { border-collapse: collapse; width: 100%; font-size: 13px; white-space: nowrap; }
+.tablewrap th, .tablewrap td { padding: 6px 9px; text-align: right; border-bottom: 1px solid #eee3cf; }
+.tablewrap th:first-child, .tablewrap td:first-child { text-align: left; }
+.tablewrap th { color: var(--sub); font-weight: 500; background: #fbf6ea; position: sticky; top: 0; }
+.tablewrap td.na { color: #b9b0a0; }
+.foot-note { color: var(--sub); font-size: 12.5px; margin: 16px 2px 0; line-height: 1.7; }
+@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .scard b { font-size: 18px; } }
+
 .foot { text-align: center; color: var(--sub); font-size: 13px; padding: 26px 16px 40px; border-top: 1px solid var(--line); }
 .foot a { color: var(--sea); }
 

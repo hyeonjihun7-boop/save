@@ -16,6 +16,7 @@
     <nav class="tabs">
       <button class="tab active" data-view="home">갤러리</button>
       <button class="tab" data-view="favs">❤ 내 즐겨찾기</button>
+      <button class="tab" data-view="stats">📊 관광 통계</button>
       <button class="tab" data-view="shop">🛍️ 굿즈샵</button>
       <button class="tab" data-view="cart">🛒 장바구니<span id="cartCount" class="badge hidden">0</span></button>
     </nav>
@@ -51,6 +52,12 @@
       <h2 class="sec-title">❤ 내 즐겨찾기</h2>
       <p id="favStatus" class="status"></p>
       <div id="favGrid" class="grid"></div>
+    </div>
+
+    <div id="statsView" class="hidden">
+      <h2 class="sec-title">📊 서귀포 직영관광지 관람객 추이</h2>
+      <p class="status">공공데이터포털(제주특별자치도 서귀포시) 월별 관람객수 · 6개 직영관광지</p>
+      <div id="statsBody"></div>
     </div>
 
     <div id="shopView" class="hidden">
