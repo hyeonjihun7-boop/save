@@ -39,6 +39,7 @@ jeju-ip/
    - `anon` `public` 키 → 메모 (`VITE_SUPABASE_ANON_KEY`)
 3. **테이블 만들기**: 왼쪽 메뉴 **SQL Editor** → *New query* → [`supabase/schema.sql`](supabase/schema.sql) 전체 붙여넣기 → **Run**
    - 확인: *Database → Tables* 에 `favorites` 가 보이고 RLS 가 켜져 있어야 함 (지금 `public` 스키마가 비어 있는 상태라면 정상)
+   - **장바구니(굿즈샵)** 를 쓰려면 같은 방식으로 [`supabase/cart.sql`](supabase/cart.sql) 도 Run → `products`(샘플 상품 8개 자동 입력), `cart_items` 테이블이 생깁니다. 여러 번 실행해도 안전합니다.
 4. **인증 설정**: **Authentication → Sign In / Providers → Email** 이 켜져 있는지 확인
    - 처음 테스트할 땐 *Confirm email* 을 끄면 가입 즉시 로그인됩니다. 켜 두면 인증 메일의 링크를 눌러야 로그인돼요(실서비스 권장).
    - 기본 메일 발송은 시간당 개수 제한이 있어요. 테스트가 막히면 *Confirm email* 을 잠시 끄세요.

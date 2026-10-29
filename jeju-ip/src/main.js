@@ -22,6 +22,7 @@ const TOPICS = [
 const state = {
   topic: TOPICS[0], q: TOPICS[0].q, page: 1, items: [], total: 0, loading: false,
   user: null, favs: new Set(), view: 'home', byId: new Map(),
+  products: [], productsErr: '', cart: new Map(), // cart: product_id -> quantity
 };
 
 /* ---------- 작은 유틸 ---------- */
@@ -185,10 +186,11 @@ $('#viewBody').addEventListener('click', e => { const heart = e.target.closest('
 /* ---------- 탭 전환 ---------- */
 function switchView(v) {
   state.view = v;
-  $('#homeView').classList.toggle('hidden', v !== 'home');
-  $('#favsView').classList.toggle('hidden', v !== 'favs');
+  ['home', 'favs', 'shop', 'cart'].forEach(name => $(`#${name}View`).classList.toggle('hidden', v !== name));
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
   if (v === 'favs') renderFavs();
+  if (v === 'shop') renderShop();
+  if (v === 'cart') renderCart();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 document.querySelector('.tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) switchView(t.dataset.view); });
@@ -265,8 +267,133 @@ $('#authBox').addEventListener('click', async e => {
 function setUser(user) {
   state.user = user;
   renderAuth();
-  setTimeout(loadFavs, 0); // onAuthStateChange 콜백 안에서 supabase 호출을 await 하면 교착될 수 있어 한 틱 미룸
+  setTimeout(() => { loadFavs(); loadCart(); }, 0); // onAuthStateChange 콜백 안에서 supabase 호출을 await 하면 교착될 수 있어 한 틱 미룸
 }
+
+/* ---------- 굿즈샵 · 장바구니 (products / cart_items 테이블) ---------- */
+const won = n => Number(n).toLocaleString('ko-KR') + '원';
+
+// 상품 사진은 Pixabay 검색 첫 결과를 사용 (없으면 이모지)
+const thumbCache = new Map();
+async function productThumb(q) {
+  if (thumbCache.has(q)) return thumbCache.get(q);
+  let url = null;
+  try { url = (await searchImages(q, 1, 3)).hits[0]?.thumb || null; } catch { /* 이모지로 대체 */ }
+  thumbCache.set(q, url);
+  return url;
+}
+const fillThumb = (el, q) => productThumb(q).then(u => { if (u && el.isConnected) { el.style.backgroundImage = `url("${u}")`; el.classList.add('has'); } });
+
+async function loadProducts() {
+  if (!hasSupabase) return;
+  const { data, error } = await supabase.from('products').select('*').eq('active', true).order('id');
+  if (error) state.productsErr = error.message; else { state.productsErr = ''; state.products = data; }
+  if (state.view === 'shop') renderShop();
+  if (state.view === 'cart') renderCart();
+}
+
+function renderShop() {
+  const grid = $('#shopGrid'), st = $('#shopStatus');
+  if (!hasSupabase) { grid.innerHTML = ''; st.textContent = 'Supabase 환경변수를 설정하면 사용할 수 있어요.'; return; }
+  if (state.productsErr) {
+    grid.innerHTML = '';
+    st.innerHTML = `⚠️ 상품을 불러오지 못했어요: ${esc(state.productsErr)}<br>Supabase SQL Editor 에서 <code>supabase/cart.sql</code> 을 실행했는지 확인해 주세요.`;
+    st.classList.add('bad'); return;
+  }
+  st.classList.remove('bad');
+  st.textContent = state.products.length ? `상품 ${state.products.length}개 · 로그인 후 장바구니에 담을 수 있어요` : '등록된 상품이 없어요.';
+  grid.innerHTML = state.products.map(p => `
+    <article class="prod">
+      <div class="pimg" data-q="${esc(p.image_query)}"><span>${esc(p.emoji || '🍊')}</span></div>
+      <div class="pbody">
+        <h3>${esc(p.name)}</h3>
+        <p>${esc(p.description || '')}</p>
+        <div class="prow"><b>${won(p.price)}</b><button class="primary sm" data-add="${p.id}">🛒 담기</button></div>
+      </div>
+    </article>`).join('');
+  grid.querySelectorAll('.pimg').forEach(el => fillThumb(el, el.dataset.q));
+}
+
+function paintCartCount() {
+  const n = [...state.cart.values()].reduce((a, b) => a + b, 0), el = $('#cartCount');
+  el.textContent = n > 99 ? '99+' : n; el.classList.toggle('hidden', n === 0);
+}
+
+async function loadCart() {
+  state.cart = new Map();
+  if (state.user && hasSupabase) {
+    const { data, error } = await supabase.from('cart_items').select('product_id, quantity').order('created_at');
+    if (error) toast('장바구니를 불러오지 못했어요: ' + error.message);
+    else data.forEach(r => state.cart.set(Number(r.product_id), r.quantity));
+  }
+  paintCartCount();
+  if (state.view === 'cart') renderCart();
+}
+
+// 수량 설정(0 이하면 삭제). 화면을 먼저 바꾸고(낙관적 업데이트) 실패하면 되돌린다.
+async function setQty(pid, qty) {
+  if (!hasSupabase) { toast('Supabase 환경변수가 설정되지 않았어요.'); return false; }
+  if (!state.user) { openAuth('login', '장바구니는 로그인 후에 쓸 수 있어요 🛒'); return false; }
+  const prev = state.cart.get(pid) || 0; qty = Math.min(qty, 99);
+  if (qty <= 0) state.cart.delete(pid); else state.cart.set(pid, qty);
+  paintCartCount(); if (state.view === 'cart') renderCart();
+  const { error } = qty <= 0
+    ? await supabase.from('cart_items').delete().eq('product_id', pid)
+    : await supabase.from('cart_items').upsert({ product_id: pid, quantity: qty }, { onConflict: 'user_id,product_id' });
+  if (error) {
+    if (prev) state.cart.set(pid, prev); else state.cart.delete(pid);
+    paintCartCount(); if (state.view === 'cart') renderCart();
+    toast('저장에 실패했어요: ' + error.message); return false;
+  }
+  return true;
+}
+const addToCart = async pid => { if (await setQty(pid, (state.cart.get(pid) || 0) + 1)) toast('🛒 장바구니에 담았어요'); };
+
+async function clearCart() {
+  if (!state.cart.size) return;
+  const backup = new Map(state.cart);
+  state.cart = new Map(); paintCartCount(); renderCart();
+  const { error } = await supabase.from('cart_items').delete().eq('user_id', state.user.id);
+  if (error) { state.cart = backup; paintCartCount(); renderCart(); toast('비우지 못했어요: ' + error.message); }
+  else toast('장바구니를 비웠어요');
+}
+
+function renderCart() {
+  const box = $('#cartBody');
+  if (!hasSupabase) { box.innerHTML = '<p class="status">Supabase 환경변수를 설정하면 사용할 수 있어요.</p>'; return; }
+  if (!state.user) { box.innerHTML = '<p class="status">로그인하면 장바구니를 쓸 수 있어요. <button class="link" data-login>로그인하기</button></p>'; return; }
+  const pm = new Map(state.products.map(p => [Number(p.id), p]));
+  const rows = [...state.cart].filter(([pid]) => pm.has(pid));
+  if (!rows.length) { box.innerHTML = '<p class="status">장바구니가 비어 있어요. 굿즈샵에서 담아 보세요! <button class="link" data-goshop>굿즈샵 가기</button></p>'; return; }
+  let total = 0;
+  const list = rows.map(([pid, q]) => {
+    const p = pm.get(pid); total += p.price * q;
+    return `<li class="crow">
+      <div class="cthumb" data-q="${esc(p.image_query)}"><span>${esc(p.emoji || '🍊')}</span></div>
+      <div class="cinfo"><b>${esc(p.name)}</b><small>${won(p.price)}</small></div>
+      <div class="qty"><button data-dec="${pid}" aria-label="수량 줄이기">−</button><span>${q}</span><button data-inc="${pid}" aria-label="수량 늘리기">+</button></div>
+      <div class="csum">${won(p.price * q)}</div>
+      <button class="del" data-del="${pid}" aria-label="삭제">✕</button>
+    </li>`;
+  }).join('');
+  box.innerHTML = `<ul class="clist">${list}</ul>
+    <div class="ctotal"><span>합계 (${rows.reduce((a, [, q]) => a + q, 0)}개)</span><b>${won(total)}</b></div>
+    <div class="cact"><button class="plain" data-clear>비우기</button><button class="primary" data-order>주문하기 (데모)</button></div>`;
+  box.querySelectorAll('.cthumb').forEach(el => fillThumb(el, el.dataset.q));
+}
+
+$('#shopGrid').addEventListener('click', e => { const b = e.target.closest('[data-add]'); if (b) addToCart(Number(b.dataset.add)); });
+$('#cartBody').addEventListener('click', e => {
+  const t = e.target, pick = sel => t.closest(sel);
+  let b;
+  if ((b = pick('[data-inc]'))) setQty(Number(b.dataset.inc), (state.cart.get(Number(b.dataset.inc)) || 0) + 1);
+  else if ((b = pick('[data-dec]'))) setQty(Number(b.dataset.dec), (state.cart.get(Number(b.dataset.dec)) || 0) - 1);
+  else if ((b = pick('[data-del]'))) setQty(Number(b.dataset.del), 0);
+  else if (pick('[data-clear]')) clearCart();
+  else if (pick('[data-order]')) toast('결제 연동은 아직 준비 중이에요 🙏 (데모)');
+  else if (pick('[data-login]')) openAuth('login');
+  else if (pick('[data-goshop]')) switchView('shop');
+});
 
 /* ---------- 공통: 다이얼로그 닫기 ---------- */
 document.querySelectorAll('dialog').forEach(d => {
@@ -283,4 +410,5 @@ if (!hasSupabase) {
 renderChips();
 renderAuth();
 if (hasSupabase) supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null));
+loadProducts();
 load(true);

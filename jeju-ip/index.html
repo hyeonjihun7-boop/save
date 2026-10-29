@@ -16,6 +16,8 @@
     <nav class="tabs">
       <button class="tab active" data-view="home">갤러리</button>
       <button class="tab" data-view="favs">❤ 내 즐겨찾기</button>
+      <button class="tab" data-view="shop">🛍️ 굿즈샵</button>
+      <button class="tab" data-view="cart">🛒 장바구니<span id="cartCount" class="badge hidden">0</span></button>
     </nav>
     <div id="authBox" class="authbox"></div>
   </header>
@@ -49,6 +51,17 @@
       <h2 class="sec-title">❤ 내 즐겨찾기</h2>
       <p id="favStatus" class="status"></p>
       <div id="favGrid" class="grid"></div>
+    </div>
+
+    <div id="shopView" class="hidden">
+      <h2 class="sec-title">🛍️ 제주 굿즈샵</h2>
+      <p id="shopStatus" class="status"></p>
+      <div id="shopGrid" class="shop"></div>
+    </div>
+
+    <div id="cartView" class="hidden">
+      <h2 class="sec-title">🛒 장바구니</h2>
+      <div id="cartBody"></div>
     </div>
   </main>
 
