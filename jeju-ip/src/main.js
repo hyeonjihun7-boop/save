@@ -195,7 +195,7 @@ function switchView(v) {
   if (v === 'cart') renderCart();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-document.querySelector('.tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) switchView(t.dataset.view); });
+document.querySelector('.tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t && t.dataset.view) switchView(t.dataset.view); });
 
 /* ---------- 인증 (Supabase Auth) ---------- */
 const authDlg = $('#authDlg');

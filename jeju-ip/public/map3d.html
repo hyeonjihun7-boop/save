@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>제주 3D 입체 지도 · 제주이야기</title>
+<meta name="description" content="three.js(WebGL)로 만든 제주 입체 지도 — 한라산·오름·올레길·항포구·풍력발전기·등대·돌하르방·감귤 재배지와 서귀포 관광지 관람객 막대" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🗺️%3C/text%3E%3C/svg%3E" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<style>
+:root { --ink:#0d2b3a; --panel:rgba(255,255,255,.9); --line:rgba(13,43,58,.12); --accent:#ff8a1f; --sea:#0f6fa8; }
+:root.night { --ink:#e8f1ff; --panel:rgba(14,24,48,.88); --line:rgba(255,255,255,.14); }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; font-family: 'Noto Sans KR', system-ui, sans-serif; background: #9fd8ee; color: var(--ink); }
+canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.glass { background: var(--panel); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+
+#top { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; align-items: center; gap: 12px; pointer-events: none; }
+#top > * { pointer-events: auto; }
+#top .back { padding: 8px 14px; text-decoration: none; color: inherit; font-weight: 500; white-space: nowrap; }
+#top h1 { margin: 0; font-size: 17px; padding: 8px 16px; white-space: nowrap; }
+#top h1 small { font-weight: 400; opacity: .7; margin-left: 8px; font-size: 12px; }
+
+#panel { position: fixed; top: 64px; left: 12px; width: 232px; max-height: calc(100% - 150px); display: flex; flex-direction: column; overflow: hidden; }
+#panel header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px 6px; font-weight: 700; font-size: 14px; }
+#panel header button { background: none; border: 0; font-size: 16px; padding: 0 4px; }
+#panelBody { overflow-y: auto; padding: 0 8px 10px; }
+#panel.collapsed #panelBody { display: none; }
+.layer { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 8px; font-size: 13px; cursor: pointer; user-select: none; }
+.layer:hover { background: rgba(127,127,127,.12); }
+.layer input { accent-color: var(--accent); margin: 0; }
+.layer .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.layer .n { margin-left: auto; opacity: .55; font-size: 12px; }
+#poiList details { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 4px; }
+#poiList summary { font-size: 12px; font-weight: 700; opacity: .75; cursor: pointer; padding: 3px 6px; }
+#poiList button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 4px 8px 4px 16px; font-size: 12.5px; border-radius: 6px; }
+#poiList button:hover { background: rgba(127,127,127,.15); }
+
+#toolbar { position: fixed; right: 12px; top: 64px; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+#toolbar button { background: transparent; border: 1px solid var(--line); padding: 7px 12px; font-size: 13px; text-align: left; border-radius: 10px; }
+#toolbar button:hover, #toolbar button.on { background: var(--accent); color: #fff; }
+#toolbar hr { border: 0; border-top: 1px solid var(--line); margin: 2px 0; width: 100%; }
+
+#info { position: fixed; right: 12px; bottom: 96px; width: 320px; max-height: 52vh; overflow-y: auto; padding: 16px 18px; transition: opacity .2s, transform .2s; }
+#info.hidden { opacity: 0; transform: translateY(12px); pointer-events: none; }
+#info .tag { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; border-radius: 999px; padding: 2px 9px; }
+#info h2 { margin: 6px 0 4px; font-size: 19px; }
+#info p { margin: 6px 0; font-size: 13.5px; line-height: 1.6; }
+#info .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+#info .meta span { font-size: 12px; background: rgba(127,127,127,.16); border-radius: 6px; padding: 2px 8px; }
+#info .x { position: absolute; top: 8px; right: 10px; background: none; border: 0; font-size: 18px; }
+#info .vis { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12.5px; }
+#info .vis b { font-size: 20px; }
+#info svg { width: 100%; height: 56px; display: block; margin-top: 4px; }
+
+#data { position: fixed; left: 12px; right: 12px; bottom: 12px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; max-width: 760px; margin: 0 auto; }
+#data .ttl { font-size: 13px; font-weight: 700; white-space: nowrap; }
+#data input[type=range] { flex: 1; min-width: 140px; accent-color: var(--accent); }
+#data .ym { font-weight: 700; min-width: 54px; font-variant-numeric: tabular-nums; }
+#data .msg { font-size: 12.5px; opacity: .8; flex: 1; min-width: 180px; }
+#data button { border: 1px solid var(--line); background: rgba(127,127,127,.12); border-radius: 8px; padding: 5px 10px; font-size: 13px; }
+#data input[type=password], #data input[type=text] { flex: 1; min-width: 160px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.7); font: inherit; font-size: 13px; }
+.hidden { display: none !important; }
+
+#labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.lbl { position: absolute; left: 0; top: 0; white-space: nowrap; font-size: 12px; font-weight: 700; padding: 2px 8px 2px 6px; border-radius: 999px; background: rgba(255,255,255,.88); color: #12303f; box-shadow: 0 2px 8px rgba(0,0,0,.25); transition: opacity .15s; will-change: transform; border-left: 4px solid var(--c, #888); }
+.lbl.hl { background: #fff; transform-origin: left top; z-index: 5; box-shadow: 0 0 0 2px var(--c), 0 4px 14px rgba(0,0,0,.35); }
+.vbar { position: absolute; left: 0; top: 0; font-size: 11.5px; font-weight: 700; color: #fff; background: rgba(15,40,60,.85); border-radius: 6px; padding: 1px 6px; white-space: nowrap; will-change: transform; }
+
+#loading { position: fixed; inset: 0; display: grid; place-items: center; background: #0b2a3a; color: #cfe9f5; z-index: 20; font-size: 15px; transition: opacity .5s; }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading div { text-align: center; line-height: 2; }
+#loading .sp { width: 38px; height: 38px; border: 4px solid rgba(255,255,255,.2); border-top-color: #ff8a1f; border-radius: 50%; margin: 0 auto 10px; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#hint { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); font-size: 12px; padding: 5px 14px; border-radius: 999px; background: rgba(0,0,0,.45); color: #fff; pointer-events: none; transition: opacity 1s; white-space: nowrap; }
+
+@media (max-width: 760px) {
+  #top h1 small { display: none; }
+  #panel { width: 190px; top: 56px; max-height: 40vh; }
+  #toolbar { top: 56px; }
+  #toolbar button { padding: 6px 9px; font-size: 12px; }
+  #info { left: 12px; right: 12px; width: auto; bottom: 120px; max-height: 38vh; }
+  #hint { display: none; }
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+
+<div id="top">
+  <a class="back glass" href="/">← 제주이야기</a>
+  <h1 class="glass">🗺️ 제주 3D 입체 지도 <small>드래그 회전 · 휠/핀치 확대 · 마커 클릭</small></h1>
+</div>
+
+<aside id="panel" class="glass">
+  <header><span>레이어</span><button id="panelToggle" aria-label="패널 접기">–</button></header>
+  <div id="panelBody">
+    <div id="layerList"></div>
+    <div id="poiList"></div>
+  </div>
+</aside>
+
+<div id="toolbar" class="glass" style="padding:8px">
+  <button data-view="all">🏝️ 제주 전체</button>
+  <button data-view="halla">⛰️ 한라산</button>
+  <button data-view="seogwipo">🍊 서귀포</button>
+  <button data-view="seongsan">🌅 성산·우도</button>
+  <button data-view="west">🌬️ 서부 해안</button>
+  <hr />
+  <button id="btnNight">🌙 밤으로</button>
+  <button id="btnSpin">🔄 자동 회전</button>
+</div>
+
+<div id="info" class="glass hidden"></div>
+<div id="hint">마커나 라벨을 눌러 보세요</div>
+
+<div id="data" class="glass">
+  <span class="ttl">📊 서귀포 직영관광지 관람객 (3D 막대)</span>
+  <span class="msg" id="dataMsg">불러오는 중…</span>
+</div>
+
+<div id="loading"><div><div class="sp"></div>제주 지형을 빚는 중…</div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ───────────── 좌표계 ─────────────
+   1 unit = 1 km (수평). 높이는 4배 과장. 경도/위도 → x/z */
+const LON0 = 126.55, LAT0 = 33.38, KX = 93, KZ = 111, EXAG = 4;
+const toX = lon => (lon - LON0) * KX;
+const toZ = lat => -(lat - LAT0) * KZ;
+const mY = m => (m / 1000) * EXAG;
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = s => document.querySelector(s);
+
+function mulberry32(a) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function hash2(ix, iz) { let h = (Math.imul(ix, 374761393) + Math.imul(iz, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+function vnoise(x, z) { const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz; const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz); const a = hash2(ix, iz), b = hash2(ix + 1, iz), c = hash2(ix, iz + 1), d = hash2(ix + 1, iz + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
+function fbm(x, z, o = 4) { let s = 0, a = .5, f = 1; for (let i = 0; i < o; i++) { s += a * vnoise(x * f, z * f); a *= .5; f *= 2; } return s / (1 - Math.pow(.5, o)) * .5 + .0; }
+
+/* ───────────── 카테고리 ───────────── */
+const CATS = {
+  spot:   { label: '관광지',      color: '#ff4f78', icon: '📍', maxD: 230, pinH: 1.1 },
+  oreum:  { label: '오름',        color: '#5fc84a', icon: '⛰️', maxD: 90,  pinH: 1.0 },
+  olle:   { label: '올레길',      color: '#ff9a1f', icon: '🥾', maxD: 100, pinH: 1.1 },
+  port:   { label: '항·포구',     color: '#2f8fff', icon: '⚓', maxD: 80,  pinH: 1.3 },
+  wind:   { label: '풍력발전기',  color: '#58d3f0', icon: '🌬️', maxD: 100, pinH: 2.5 },
+  light:  { label: '등대',        color: '#ffd23f', icon: '🗼', maxD: 100, pinH: 2.3 },
+  statue: { label: '돌하르방',    color: '#b9a999', icon: '🗿', maxD: 80,  pinH: 2.0 },
+  citrus: { label: '감귤 재배지', color: '#ffa31a', icon: '🍊', maxD: 110, pinH: 1.2 },
+  bars:   { label: '관람객 막대', color: '#e0245e', icon: '📊' },
+  cloud:  { label: '구름',        color: '#d8e6ee', icon: '☁️' },
+};
+
+/* ───────────── 관심 지점(POI) ───────────── */
+const P = [];
+const add = (cat, name, lon, lat, desc, o = {}) => P.push({ id: 'p' + P.length, cat, name, lon, lat, desc, ...o });
+
+add('spot', '한라산 백록담', 126.533, 33.362, '해발 1,947m, 남한에서 가장 높은 산. 정상의 화구호 백록담과 함께 「제주 화산섬과 용암동굴」 유네스코 세계자연유산의 중심입니다.', { meta: ['해발 1,947m', '유네스코 세계자연유산'], big: true });
+add('spot', '성산일출봉', 126.9425, 33.4585, '바다 위에서 솟아오른 수성화산 응회구. 분화구를 둘러싼 99개 바위봉우리와 일출 명소로 유명합니다.', { meta: ['해발 179m', '유네스코 세계자연유산'], bump: [170, .5, 1.6] });
+add('spot', '만장굴', 126.771, 33.528, '거문오름에서 흘러내린 용암이 만든 세계 최상급 용암동굴. 일부 구간이 일반에 개방됩니다.', { meta: ['용암동굴', '세계자연유산'] });
+add('spot', '협재해수욕장', 126.2395, 33.394, '에메랄드빛 얕은 바다와 하얀 조개모래, 앞바다의 비양도가 어우러진 서부 대표 해변.', { meta: ['서부 해안'] });
+add('spot', '섭지코지', 126.9305, 33.4235, '바다로 길게 뻗은 붉은 화산재 지형의 곶. 유채꽃과 등대, 바다 풍경으로 사랑받는 산책 명소.', { bump: [28, .7, 1.3] });
+add('spot', '비자림', 126.806, 33.490, '500~800년 된 비자나무 수천 그루가 모인 숲. 삼림욕 코스로 인기가 높습니다.', { meta: ['천연 비자나무 군락'] });
+add('spot', '천지연폭포', 126.5545, 33.2465, '서귀포 시내 가까이에서 시원하게 떨어지는 폭포. 울창한 난대림 사이로 산책로가 이어집니다.', { site: '천지연폭포', meta: ['서귀포 직영관광지'] });
+add('spot', '정방폭포', 126.571, 33.2445, '폭포수가 바다로 곧장 떨어지는 보기 드문 해안 폭포.', { site: '정방폭포', meta: ['서귀포 직영관광지'] });
+add('spot', '천제연폭포', 126.4155, 33.2535, '중문관광단지 안쪽의 3단 폭포. 선임교(칠선녀 다리)와 계곡 풍경이 아름답습니다.', { site: '천제연폭포', meta: ['서귀포 직영관광지'] });
+add('spot', '중문대포 주상절리대', 126.4255, 33.2385, '용암이 식으며 만든 육각 기둥 절벽이 바다에 줄지어 선 천연기념물. 파도가 부서지는 모습이 장관입니다.', { site: '중문대포 주상절리대', meta: ['천연기념물', '서귀포 직영관광지'] });
+add('spot', '산방산·용머리해안', 126.3135, 33.2395, '종 모양 용암돔 산방산(해발 395m)과 바닷가 퇴적암 절벽 용머리해안.', { site: '산방산_용머리', meta: ['산방산 해발 395m', '서귀포 직영관광지'], bump: [380, .55, 1.4] });
+add('spot', '감귤박물관', 126.6185, 33.2915, '제주 감귤의 역사와 재배·품종을 소개하는 박물관. 효돈 감귤 지대 한가운데 있습니다.', { site: '감귤박물관', meta: ['서귀포 직영관광지'] });
+
+add('oreum', '새별오름', 126.3575, 33.3645, '들불축제가 열리는 서부의 대표 오름. 억새가 물드는 가을 저녁 풍경이 일품입니다.', { meta: ['해발 519m'], bump: [125, .75, 0] });
+add('oreum', '금오름', 126.3015, 33.3455, '정상의 둥근 화구호와 협재 바다 조망으로 유명한 오름.', { meta: ['해발 427m'], bump: [110, .65, 0] });
+add('oreum', '산굼부리', 126.6885, 33.4315, '평지에 푹 꺼진 거대한 분화구를 가진 오름. 천연기념물로 보호됩니다.', { meta: ['해발 438m', '천연기념물'], bump: [60, .8, 0] });
+add('oreum', '거문오름', 126.7175, 33.4535, '만장굴 등 용암동굴계를 만든 용암이 흘러나온 분화구. 세계자연유산 구역입니다.', { meta: ['해발 456m', '세계자연유산'], bump: [110, .7, 0] });
+add('oreum', '다랑쉬오름', 126.8035, 33.4875, '“오름의 여왕”이라 불리는 깊은 원형 분화구의 오름.', { meta: ['해발 382m'], bump: [110, .6, 0] });
+add('oreum', '용눈이오름', 126.8095, 33.4605, '부드러운 곡선의 능선이 아름다워 사진가들이 즐겨 찾는 오름.', { meta: ['해발 248m'], bump: [85, .6, 0] });
+add('oreum', '따라비오름', 126.8335, 33.3715, '세 개의 분화구가 이어진 우아한 능선, 억새 명소.', { meta: ['해발 342m'], bump: [90, .6, 0] });
+add('oreum', '물영아리오름', 126.6905, 33.3745, '정상 분화구에 습지(람사르 습지)를 품은 오름.', { meta: ['해발 508m', '람사르 습지'], bump: [135, .6, 0] });
+add('oreum', '송악산', 126.2905, 33.2055, '바다 쪽으로 불쑥 솟은 이중 분화구 오름. 마라도·가파도 전망대.', { meta: ['해발 104m'], bump: [95, .5, 1.5] });
+add('oreum', '도두봉', 126.4665, 33.5115, '공항 근처 바닷가의 작은 오름. 정상에서 제주 시내와 바다가 한눈에 보입니다.', { meta: ['해발 65m'], bump: [58, .4, 1.0] });
+
+const OLLE = [
+  ['올레 1코스', 126.9055, 33.4705, '시흥초등학교에서 광치기해변까지. 말미오름·알오름을 지나 성산일출봉이 보이는 시작 코스.'],
+  ['올레 7코스', 126.541, 33.2395, '외돌개에서 월평까지. 서귀포 해안 절벽과 바다 풍경이 이어지는 인기 코스.'],
+  ['올레 10코스', 126.3005, 33.2175, '하모해수욕장에서 화순금모래해수욕장까지. 송악산과 산방산을 걷는 코스.'],
+  ['올레 14코스', 126.2575, 33.4005, '저지에서 한림까지. 곶자왈과 협재·금능 해변을 지납니다.'],
+  ['올레 18코스', 126.575, 33.5225, '제주 원도심에서 조천까지. 제주항과 북쪽 해안 마을을 연결합니다.'],
+  ['올레 21코스', 126.8845, 33.5045, '하도에서 종달까지. 철새도래지와 지미봉, 우도 조망이 있는 마지막 코스.'],
+];
+OLLE.forEach(o => add('olle', o[0], o[1], o[2], o[3], { meta: ['제주올레 26개 코스 · 약 425km'], place: 'land' }));
+
+const PORTS = [
+  ['제주항', 126.5455, 33.5265, '항', '제주 관문 항구. 부산·목포 등 육지와 연결되는 여객선과 화물선이 드나듭니다.'],
+  ['애월항', 126.3125, 33.4745, '항', '서북부 애월 해안의 항구. 어선과 레저 보트가 오갑니다.'],
+  ['한림항', 126.266, 33.4155, '항', '비양도 도항선이 출항하는 서부 어업 중심 항구.'],
+  ['성산포항', 126.9365, 33.472, '항', '우도로 가는 도항선이 오가는 동부의 관문.'],
+  ['서귀포항', 126.5635, 33.2395, '항', '새섬·새연교와 이어진 남쪽 항구. 마라도·가파도 방면 유람선도 있습니다.'],
+  ['화순항', 126.3375, 33.2335, '항', '남서부 화순 해안의 항구.'],
+  ['모슬포항', 126.2515, 33.2125, '항', '마라도·가파도로 가는 배가 뜨는 최남단 항구.'],
+  ['김녕포구', 126.7595, 33.5585, '포구', '맑은 바다와 현무암 해안이 어우러진 북동부의 작은 포구.'],
+  ['세화포구', 126.8625, 33.5275, '포구', '해녀와 어선이 드나드는 구좌 해안 포구.'],
+  ['신양포구', 126.9215, 33.4445, '포구', '섭지코지 가까운 성산 해안 포구.'],
+  ['사계포구', 126.3075, 33.2325, '포구', '산방산과 형제섬이 보이는 남서부 포구.'],
+  ['쇠소깍', 126.6225, 33.2525, '포구', '효돈천이 바다와 만나는 하구. 테우 체험으로 유명합니다.'],
+  ['구엄포구', 126.4005, 33.4875, '포구', '“돌염전”으로 알려진 애월 해안 마을 포구.'],
+];
+PORTS.forEach(o => add('port', o[0], o[1], o[2], o[4], { meta: [o[3]], kind: o[3] }));
+
+add('wind', '행원·김녕 풍력단지', 126.775, 33.556, '제주 북동부 해안에 늘어선 육상 풍력발전기. 거센 바닷바람으로 전기를 만듭니다.', { wind: { mode: 'coast', n: 10, sp: .85 }, meta: ['해안 풍력'] });
+add('wind', '한경·신창 풍력단지', 126.171, 33.337, '서쪽 끝 한경면 해안의 풍력단지. 일몰과 함께 바라보는 풍경으로 유명합니다.', { wind: { mode: 'coast', n: 6, sp: .9 }, meta: ['해안 풍력'] });
+add('wind', '탐라해상풍력', 126.17, 33.345, '바다 위에 세워진 국내 최초의 상업용 해상풍력단지.', { wind: { mode: 'offshore', n: 5, sp: 1.0 }, meta: ['해상 풍력'] });
+add('wind', '가시리 풍력단지', 126.775, 33.378, '중산간 초원에 서 있는 풍력발전기. 따라비오름·큰사슴이오름과 함께 보입니다.', { wind: { mode: 'inland', n: 8, r: 2.6 }, meta: ['중산간 풍력'] });
+
+add('light', '도두 등대', 126.4675, 33.513, '제주공항과 도두봉 사이 해안에서 제주 북쪽 바다를 밝히는 등대.', { place: 'shore' });
+add('light', '우도 등대', 126.9575, 33.5075, '우도봉 정상에 서서 동쪽 바다를 비추는 등대.', { place: 'land' });
+add('light', '마라도 등대', 126.2695, 33.1135, '국토 최남단 마라도의 등대. 대한민국 최남단 표지석 근처에 있습니다.', { place: 'land' });
+add('light', '차귀도 등대', 126.1455, 33.3145, '한경면 앞바다 무인도 차귀도의 등대. 낚시와 석양 명소로 유명합니다.', { place: 'land' });
+add('light', '성산 등대', 126.9335, 33.4625, '성산일출봉 아래 해안에서 동쪽 바다를 지키는 등대.', { place: 'shore' });
+
+add('statue', '제주목관아 돌하르방', 126.5215, 33.5135, '제주 원도심 제주목관아 앞의 돌하르방. 제주의 수호신이자 상징입니다.', { place: 'land', meta: ['현무암 석상'] });
+add('statue', '제주공항 돌하르방', 126.4975, 33.5065, '제주에 도착한 여행자를 맞이하는 돌하르방.', { place: 'land' });
+add('statue', '성읍민속마을 돌하르방', 126.7955, 33.3885, '옛 정의현 읍성 마을에 전해지는 전통 돌하르방.', { place: 'land' });
+add('statue', '서귀포 돌하르방', 126.5605, 33.2535, '서귀포 시내의 돌하르방. 남쪽 바다를 바라보고 서 있습니다.', { place: 'land' });
+add('statue', '대정 돌하르방', 126.2545, 33.2245, '대정읍성 일대에 세워진 돌하르방. 추사 김정희 유배지와 가깝습니다.', { place: 'land' });
+add('statue', '성산 돌하르방', 126.9365, 33.4505, '성산일출봉 입구에서 방문객을 맞이합니다.', { place: 'land' });
+
+add('citrus', '서귀포 감귤 재배지', 126.5705, 33.2835, '제주 감귤은 한라산 남쪽의 따뜻한 해발 수백 m 이하 완경사지에서 주로 재배됩니다. 노지 온주 감귤은 늦가을~겨울에 수확합니다.', { place: 'land', meta: ['노지 감귤'] });
+add('citrus', '효돈·남원 감귤밭', 126.66, 33.2905, '감귤나무가 바둑판처럼 이어지는 남동부 지대. 돌담과 방풍림이 밭을 감쌉니다.', { place: 'land', meta: ['노지 감귤'] });
+add('citrus', '안덕·대정 감귤밭', 126.3305, 33.2755, '산방산 북쪽 완만한 사면의 감귤 재배지. 한라봉·천혜향 등 만감류도 자랍니다.', { place: 'land', meta: ['만감류 · 노지 감귤'] });
+
+const SITES = ['천지연폭포', '중문대포 주상절리대', '천제연폭포', '정방폭포', '산방산_용머리', '감귤박물관'];
+
+/* ───────────── 해안선 · 섬 · 오름 범프 ───────────── */
+const COAST = [
+  [126.525, 33.515], [126.60, 33.535], [126.70, 33.545], [126.78, 33.555], [126.86, 33.535], [126.925, 33.485],
+  [126.92, 33.43], [126.885, 33.375], [126.82, 33.315], [126.735, 33.275], [126.645, 33.250], [126.565, 33.238],
+  [126.485, 33.235], [126.405, 33.238], [126.325, 33.222], [126.255, 33.205], [126.19, 33.255], [126.165, 33.315],
+  [126.205, 33.385], [126.27, 33.425], [126.335, 33.46], [126.40, 33.495], [126.47, 33.512],
+].map(([lo, la]) => [toX(lo), toZ(la)]);
+function chaikin(pts) { const o = []; for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; o.push([.75 * a[0] + .25 * b[0], .75 * a[1] + .25 * b[1]], [.25 * a[0] + .75 * b[0], .25 * a[1] + .75 * b[1]]); } return o; }
+let poly = COAST; for (let i = 0; i < 3; i++) poly = chaikin(poly);
+const PN = poly.length, PX = Float64Array.from(poly, p => p[0]), PZ = Float64Array.from(poly, p => p[1]);
+
+function polyNearest(x, z) {
+  let best = 1e18, qx = 0, qz = 0, inside = false;
+  for (let i = 0, j = PN - 1; i < PN; j = i++) {
+    const xi = PX[i], zi = PZ[i], xj = PX[j], zj = PZ[j];
+    if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
+    const ex = xj - xi, ez = zj - zi;
+    let t = ((x - xi) * ex + (z - zi) * ez) / (ex * ex + ez * ez); t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const px = xi + t * ex, pz = zi + t * ez, dx = x - px, dz = z - pz, dd = dx * dx + dz * dz;
+    if (dd < best) { best = dd; qx = px; qz = pz; }
+  }
+  const d = Math.sqrt(best);
+  let nx = (x - qx) / (d || 1), nz = (z - qz) / (d || 1);   // 점에서 해안선으로 멀어지는 방향
+  if (inside) { nx = -nx; nz = -nz; }                       // 안쪽 점이면 바다 쪽(바깥) 방향으로 뒤집기
+  return { d: inside ? d : -d, qx, qz, nx, nz };
+}
+const ISLETS = [ // lon, lat, rx, rz(km), 높이(m)
+  [126.955, 33.503, 1.9, 1.35, 110], [126.27, 33.1705, 1.2, .5, 18], [126.2695, 33.1135, .9, .5, 40],
+  [126.1455, 33.3135, .7, .45, 70], [126.228, 33.4025, .6, .5, 112], [126.5645, 33.2235, .38, .3, 100], [126.5155, 33.2195, .38, .32, 90],
+].map(([lo, la, rx, rz, h]) => ({ x: toX(lo), z: toZ(la), rx, rz, h }));
+
+const BUMPS = []; // {x,z,a,s,push}
+ISLETS.forEach(i => BUMPS.push({ x: i.x, z: i.z, a: i.h, s: Math.min(i.rx, i.rz) * .5, push: 0 }));
+P.forEach(p => { if (p.bump) BUMPS.push({ x: toX(p.lon), z: toZ(p.lat), a: p.bump[0], s: p.bump[1], push: p.bump[2] }); });
+const HX = toX(126.533), HZ = toZ(33.362);
+{ // 이름 없는 작은 오름 약 100개
+  const r = mulberry32(11); let n = 0, guard = 0;
+  while (n < 100 && guard++ < 4000) {
+    const x = (r() - .5) * 70, z = (r() - .5) * 38 + 2;
+    if (polyNearest(x, z).d < 2.5 || Math.hypot((x - HX) / 1.35, z - HZ) < 4.5) continue;
+    BUMPS.push({ x, z, a: 35 + r() * 75, s: .35 + r() * .35, push: 0 }); n++;
+  }
+}
+
+/* ───────────── 높이 격자 ───────────── */
+const STEP = .3, X0 = -49.5, Z0 = -28.9, NX = 331, NZ = 224;
+const H = new Float32Array(NX * NZ);
+const CIT = new Uint8Array(NX * NZ); // 감귤 벨트 마스크
+function terrainAt(x, z) {
+  let d = polyNearest(x, z).d;
+  for (const i of ISLETS) { const e = Math.hypot((x - i.x) / i.rx, (z - i.z) / i.rz); if (e < 1.3) d = Math.max(d, (1 - e) * Math.min(i.rx, i.rz)); }
+  for (const b of BUMPS) if (b.push) { const dd = (x - b.x) ** 2 + (z - b.z) ** 2; if (dd < 16 * b.s * b.s) d += b.push * Math.exp(-dd / (2 * b.s * b.s)); }
+  d += (fbm(x * .4 + 10, z * .4 - 7, 3) - .5) * 1.6;
+  if (d <= 0) return -1500 * (1 - Math.exp(d / 12));
+  let h = 22 * smooth(0, 8, d);
+  const r = Math.hypot((x - HX) / 1.35, z - HZ);
+  h += Math.min(1900, 2370 * Math.exp(-Math.sqrt(r * r + 1.44) / 6.2));
+  for (const b of BUMPS) { const dd = (x - b.x) ** 2 + (z - b.z) ** 2; if (dd < 12 * b.s * b.s) h += b.a * Math.exp(-dd / (2 * b.s * b.s)); }
+  h += (fbm(x * .5, z * .5) - .5) * 55 * smooth(0, 5, d) + (fbm(x * 2.2, z * 2.2, 3) - .5) * 14;
+  return Math.max(1.2, h * smooth(0, .4, d));
+}
+function buildGrid() {
+  for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix < NX; ix++) H[iz * NX + ix] = terrainAt(X0 + ix * STEP, Z0 + iz * STEP);
+}
+function elevM(x, z) {
+  const fx = (x - X0) / STEP, fz = (z - Z0) / STEP;
+  if (fx < 0 || fz < 0 || fx >= NX - 1 || fz >= NZ - 1) return -1500;
+  const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * NX + ix;
+  return (H[i] * (1 - tx) + H[i + 1] * tx) * (1 - tz) + (H[i + NX] * (1 - tx) + H[i + NX + 1] * tx) * tz;
+}
+const groundY = (x, z) => Math.max(0, mY(elevM(x, z)));
+
+/* ───────────── three.js 기본 ───────────── */
+const canvas = $('#c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+const SKY_DAY = new THREE.Color('#a9dcef'), SKY_NIGHT = new THREE.Color('#070d22');
+scene.background = SKY_DAY.clone(); scene.fog = new THREE.Fog(SKY_DAY.clone(), 130, 300);
+const camera = new THREE.PerspectiveCamera(45, 1, .1, 600);
+camera.position.set(0, 62, 82);
+const controls = new OrbitControls(camera, canvas);
+Object.assign(controls, { enableDamping: true, dampingFactor: .07, minDistance: 5, maxDistance: 170, maxPolarAngle: Math.PI * .47, autoRotate: true, autoRotateSpeed: .45 });
+controls.target.set(0, 0, 2);
+const hemi = new THREE.HemisphereLight('#dff3ff', '#6b7a52', 1.15); scene.add(hemi);
+const sun = new THREE.DirectionalLight('#fff1d2', 2.6); sun.position.set(-50, 70, 35); scene.add(sun);
+const fill = new THREE.DirectionalLight('#9cc4ff', .5); fill.position.set(40, 25, -40); scene.add(fill);
+
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+/* ───────────── 지형 메시 ───────────── */
+const C = s => new THREE.Color(s);
+const COL = { deep: C('#0f3556'), mid: C('#2b8aa6'), shallow: C('#d6c995'), sand: C('#e4d7a6'), basalt: C('#7a7467'), grass: C('#8dbb55'), grass2: C('#a5c45a'), cit: C('#b6bf45'), forest: C('#3f7d40'), forest2: C('#2f6b3a'), sub: C('#6f8b52'), rock: C('#8c8575'), peak: C('#7a6d60') };
+function vertexColor(x, z, h, out) {
+  if (h < 0) { const t = Math.min(1, -h / 120); return out.copy(COL.shallow).lerp(COL.mid, smooth(0, .7, t)).lerp(COL.deep, smooth(.5, 1, t)); }
+  const n = fbm(x * 1.6, z * 1.6, 3), nn = (n - .5);
+  if (h < 5) return out.copy(COL.sand).lerp(COL.basalt, .35 + nn);
+  if (h < 40) return out.copy(COL.sand).lerp(COL.grass, smooth(5, 40, h));
+  if (h < 450) { out.copy(COL.grass).lerp(COL.grass2, smooth(.3, .7, n)); const k = smooth(150, 450, h); out.lerp(COL.forest, k * .75); return out; }
+  if (h < 1100) return out.copy(COL.forest).lerp(COL.forest2, smooth(450, 1100, h)).offsetHSL(0, 0, nn * .06);
+  if (h < 1650) return out.copy(COL.forest2).lerp(COL.sub, smooth(1100, 1650, h));
+  return out.copy(COL.sub).lerp(COL.rock, smooth(1650, 1850, h)).lerp(COL.peak, smooth(1820, 1900, h) * .6);
+}
+function buildTerrain() {
+  const pos = new Float32Array(NX * NZ * 3), col = new Float32Array(NX * NZ * 3), tmp = new THREE.Color();
+  for (let iz = 0; iz < NZ; iz++) for (let ix = 0; ix < NX; ix++) {
+    const i = iz * NX + ix, x = X0 + ix * STEP, z = Z0 + iz * STEP, h = H[i];
+    pos[i * 3] = x; pos[i * 3 + 1] = mY(h); pos[i * 3 + 2] = z;
+    vertexColor(x, z, h, tmp);
+    // 감귤 벨트: 한라산 남쪽 저지대 (밭 패치 색 입히기)
+    if (h > 12 && h < 380 && z > HZ + 4.5 && fbm(x * .28, z * .28, 3) > .46) { CIT[i] = 1; tmp.lerp(COL.cit, .55); }
+    col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+  }
+  const idx = new Uint32Array((NX - 1) * (NZ - 1) * 6); let k = 0;
+  for (let iz = 0; iz < NZ - 1; iz++) for (let ix = 0; ix < NX - 1; ix++) { const a = iz * NX + ix, b = a + 1, c = a + NX, d = c + 1; idx[k++] = a; idx[k++] = c; idx[k++] = b; idx[k++] = b; idx[k++] = c; idx[k++] = d; }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .95, metalness: 0 }));
+  scene.add(m); return m;
+}
+
+/* 바다 */
+let water, waterBase;
+function buildWater() {
+  const g = new THREE.PlaneGeometry(330, 240, 110, 80); g.rotateX(-Math.PI / 2);
+  waterBase = Float32Array.from(g.attributes.position.array);
+  water = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#2a95bd', transparent: true, opacity: .8, roughness: .18, metalness: .15, flatShading: true, depthWrite: false }));
+  water.position.set(0, -.005, 4); water.renderOrder = 2; scene.add(water);
+  const abyss = new THREE.Mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: COL.deep }));
+  abyss.position.y = -6.1; scene.add(abyss);
+}
+
+/* ───────────── 마커/모델 ───────────── */
+const layers = {}; Object.keys(CATS).forEach(k => { layers[k] = new THREE.Group(); layers[k].name = k; scene.add(layers[k]); });
+const layerOn = Object.fromEntries(Object.keys(CATS).map(k => [k, true]));
+const M = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: .8, metalness: 0, ...o });
+const mats = { white: M('#f4f6f8', { roughness: .5 }), red: M('#d6362f'), stone: M('#6a655d', { flatShading: true, roughness: 1 }), dark: M('#1f1c1a'), conc: M('#b9bcc0'), wood: M('#8a6a45'), orange: M('#ff8f12', { roughness: .45 }), leaf: M('#3c9a3c') };
+const lampMat = new THREE.MeshStandardMaterial({ color: '#fff2a8', emissive: '#ffd23f', emissiveIntensity: .6 });
+const spinners = [], bobbers = [], beams = [], boats = [];
+const hitMeshes = [];
+const pinGeoCone = new THREE.ConeGeometry(.3, .8, 14).rotateX(Math.PI), pinGeoBall = new THREE.SphereGeometry(.34, 16, 12);
+
+function makePin(color, scale = 1) {
+  const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .35, roughness: .4 });
+  const cone = new THREE.Mesh(pinGeoCone, mat), ball = new THREE.Mesh(pinGeoBall, mat), dot = new THREE.Mesh(new THREE.SphereGeometry(.14, 10, 8), mats.white);
+  cone.position.y = .4; ball.position.y = .95; dot.position.y = .98; dot.position.z = .02;
+  g.add(cone, ball, dot); g.scale.setScalar(scale); return g;
+}
+function turbineModel() {
+  const g = new THREE.Group(), h = 1.7;
+  const tower = new THREE.Mesh(new THREE.CylinderGeometry(.03, .07, h, 8), mats.white); tower.position.y = h / 2; g.add(tower);
+  const nac = new THREE.Mesh(new THREE.BoxGeometry(.1, .1, .22), mats.white); nac.position.set(0, h, 0); g.add(nac);
+  const rotor = new THREE.Group(); rotor.position.set(0, h, .13);
+  const bladeGeo = new THREE.BoxGeometry(.06, .85, .012).translate(0, .45, 0);
+  for (let i = 0; i < 3; i++) { const b = new THREE.Mesh(bladeGeo, mats.white); b.rotation.z = i * Math.PI * 2 / 3; rotor.add(b); }
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(.06, 8, 6), mats.white); rotor.add(hub);
+  g.add(rotor); g.rotation.y = .75; spinners.push({ o: rotor, s: .9 + Math.random() * .6 }); return g;
+}
+function lighthouseModel() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.12, .2, 1.3, 12), mats.white); body.position.y = .65; g.add(body);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(.158, .17, .22, 12), mats.red); band.position.y = .55; g.add(band);
+  const gal = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .05, 12), mats.dark); gal.position.y = 1.32; g.add(gal);
+  const lamp = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, .22, 10), lampMat); lamp.position.y = 1.46; g.add(lamp);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(.17, .22, 10), mats.red); roof.position.y = 1.68; g.add(roof);
+  const bg = new THREE.ConeGeometry(.3, 3.4, 16, 1, true); bg.translate(0, -1.7, 0); bg.rotateZ(Math.PI / 2);
+  const bm = new THREE.MeshBasicMaterial({ color: '#ffe27a', transparent: true, opacity: .15, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const beam = new THREE.Group(); beam.position.y = 1.46;
+  const b1 = new THREE.Mesh(bg, bm), b2 = new THREE.Mesh(bg, bm); b2.rotation.y = Math.PI; beam.add(b1, b2); g.add(beam);
+  beams.push({ o: beam, m: bm }); return g;
+}
+function statueModel() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.2, .25, .6, 12), mats.stone); body.position.y = .3; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.22, 14, 10), mats.stone); head.scale.set(1, 1.1, 1); head.position.y = .78; g.add(head);
+  const hat = new THREE.Mesh(new THREE.CylinderGeometry(.13, .27, .16, 14), mats.stone); hat.position.y = 1.0; g.add(hat);
+  const hat2 = new THREE.Mesh(new THREE.CylinderGeometry(.1, .13, .07, 14), mats.stone); hat2.position.y = 1.13; g.add(hat2);
+  for (const sx of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(.035, 8, 6), mats.dark); eye.position.set(sx * .08, .82, .2); g.add(eye);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), mats.stone); hand.position.set(sx * .2, sx > 0 ? .52 : .38, .17); g.add(hand);
+  }
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(.055, 8, 6), mats.stone); nose.scale.set(1, 1.2, 1.2); nose.position.set(0, .76, .22); g.add(nose);
+  g.scale.setScalar(1.35); return g;
+}
+function boatModel(color) {
+  const g = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(.2, .09, .46), M(color)); hull.position.y = .03; g.add(hull);
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(.1, .2, 4), M(color)); bow.rotation.x = Math.PI / 2; bow.rotation.y = Math.PI / 4; bow.position.set(0, .03, .33); bow.scale.set(1, 1, .9); g.add(bow);
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(.14, .12, .16), mats.white); cab.position.set(0, .14, -.05); g.add(cab);
+  boats.push({ o: g, ph: Math.random() * 6 }); return g;
+}
+function portModel(kind) {
+  const g = new THREE.Group(), L = kind === '항' ? 1.7 : 1.1;
+  const pier = new THREE.Mesh(new THREE.BoxGeometry(.16, .07, L), mats.conc); pier.position.set(0, .04, L / 2); g.add(pier);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(.015, .015, .22, 6), mats.dark); post.position.set(0, .2, L - .02); g.add(post);
+  const bl = new THREE.Mesh(new THREE.SphereGeometry(.04, 8, 6), new THREE.MeshBasicMaterial({ color: '#ff5a3a' })); bl.position.set(0, .33, L - .02); g.add(bl);
+  if (kind === '항') {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(.11, .09, 1.2), mats.conc); arm.position.set(.55, .05, L * .45); g.add(arm);
+    const arm2 = new THREE.Mesh(new THREE.BoxGeometry(.11, .09, 1.1), mats.conc); arm2.position.set(-.55, .05, L * .38); g.add(arm2);
+  }
+  const cols = ['#e8453c', '#2f7fd6', '#f0a41a', '#2fa36b'];
+  const nb = kind === '항' ? 4 : 2;
+  for (let i = 0; i < nb; i++) { const b = boatModel(cols[(i + Math.floor(Math.random() * 4)) % 4]); b.position.set((i % 2 ? .24 : -.24) * (1 + Math.floor(i / 2) * .6), 0, .5 + (i * .31) % (L - .3)); b.rotation.y = (Math.random() - .5) * .5; g.add(b); }
+  return g;
+}
+function citrusModel() {
+  const g = new THREE.Group();
+  const f = new THREE.Mesh(new THREE.SphereGeometry(.38, 18, 14), mats.orange); f.scale.y = .9; f.position.y = .4; g.add(f);
+  const leaf = new THREE.Mesh(new THREE.ConeGeometry(.16, .22, 4), mats.leaf); leaf.rotation.set(0, .5, Math.PI); leaf.position.set(.06, .8, 0); leaf.scale.set(1.3, .5, .7); g.add(leaf);
+  const st = new THREE.Mesh(new THREE.CylinderGeometry(.015, .02, .12, 5), mats.wood); st.position.y = .8; g.add(st); return g;
+}
+
+/* ── 해안선 보조: 바다→육지 경계 찾기 ── */
+function shoreFrom(x, z) {
+  const n = polyNearest(x, z); const sx = n.qx - n.nx * 3.5, sz = n.qz - n.nz * 3.5;
+  for (let k = 0; k < 90; k++) { const px = sx + n.nx * k * .1, pz = sz + n.nz * k * .1; if (elevM(px, pz) < 1.5) return { x: px - n.nx * .1, z: pz - n.nz * .1, nx: n.nx, nz: n.nz }; }
+  return { x: n.qx, z: n.qz, nx: n.nx, nz: n.nz };
+}
+function landPoint(x, z) {
+  for (let i = 0; i < 60 && elevM(x, z) < 4; i++) { const dx = HX - x, dz = HZ - z, l = Math.hypot(dx, dz) || 1; x += dx / l * .1; z += dz / l * .1; }
+  return { x, z };
+}
+
+/* ── POI 배치 ── */
+const poiById = {}, labelEls = {};
+function placePOIs() {
+  const r = mulberry32(5);
+  for (const p of P) {
+    poiById[p.id] = p; const cat = CATS[p.cat];
+    let x = toX(p.lon), z = toZ(p.lat), model = null, top = cat.pinH, yaw = 0;
+    const grp = new THREE.Group();
+    if (p.cat === 'port') {
+      const s = shoreFrom(x, z); x = s.x; z = s.z; model = portModel(p.kind); yaw = Math.atan2(s.nx, s.nz);
+    } else if (p.place === 'shore') {
+      const s = shoreFrom(x, z); x = s.x - s.nx * .25; z = s.z - s.nz * .25;
+    } else if (p.place === 'land' || p.cat === 'olle' || p.cat === 'statue' || p.cat === 'citrus' || p.cat === 'light') {
+      ({ x, z } = landPoint(x, z));
+    } else if (p.cat === 'spot' || p.cat === 'oreum') {
+      ({ x, z } = landPoint(x, z));
+    }
+    const y = p.cat === 'wind' ? 0 : groundY(x, z);
+    if (p.cat === 'port') { grp.position.set(x, .0, z); grp.rotation.y = yaw; model.position.set(0, 0, 0); grp.add(model); }
+    else if (p.cat === 'light') { model = lighthouseModel(); grp.position.set(x, y, z); grp.add(model); }
+    else if (p.cat === 'statue') { model = statueModel(); grp.position.set(x, y, z); grp.rotation.y = r() * .8 - .4 + Math.PI * .0; grp.add(model); }
+    else if (p.cat === 'citrus') { model = citrusModel(); grp.position.set(x, y, z); grp.add(model); }
+    else grp.position.set(x, y, z);
+
+    let anchor = new THREE.Vector3(x, y, z), cx = x, cz = z;
+    if (p.cat === 'wind') { const r2 = placeWind(p, r); anchor.set(r2.cx, r2.top, r2.cz); cx = r2.cx; cz = r2.cz; grp.position.set(0, 0, 0); p.hitR = Math.max(1.6, r2.rad); }
+    p.pos = new THREE.Vector3(cx, p.cat === 'wind' ? 0 : y, cz);
+    const pinBase = (p.big ? mY(1947) : y) + (p.cat === 'wind' ? 0 : 0);
+    const pinY = p.cat === 'wind' ? anchor.y - .4 : p.big ? mY(1947) + .2 : y + Math.max(cat.pinH - .85, .15) + (p.cat === 'port' ? .1 : 0);
+    const pin = makePin(cat.color, p.big ? 1.5 : p.cat === 'wind' ? .8 : 1);
+    pin.position.set(p.cat === 'wind' ? cx : p.cat === 'port' ? x : x, pinY, p.cat === 'wind' ? cz : z);
+    layers[p.cat].add(pin); bobbers.push({ o: pin, y0: pin.position.y, ph: r() * 6 });
+    if (p.cat !== 'wind') layers[p.cat].add(grp); else layers[p.cat].add(grp);
+    p.anchor = new THREE.Vector3(pin.position.x, pin.position.y + (p.big ? 1.45 : 1.15), pin.position.z);
+    p.base = new THREE.Vector3(p.cat === 'wind' ? cx : x, p.cat === 'wind' ? 0 : y, p.cat === 'wind' ? cz : z);
+    // 클릭 판정용 투명 구
+    const hit = new THREE.Mesh(new THREE.SphereGeometry(p.hitR || (p.big ? 1.6 : 1.0), 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
+    hit.position.copy(p.cat === 'wind' ? new THREE.Vector3(cx, pin.position.y - .3, cz) : new THREE.Vector3(pin.position.x, pin.position.y + .5, pin.position.z));
+    hit.userData.poi = p; layers[p.cat].add(hit); hitMeshes.push(hit);
+  }
+}
+function placeWind(p, r) {
+  const w = p.wind, pts = [];
+  const x0 = toX(p.lon), z0 = toZ(p.lat);
+  if (w.mode === 'coast' || w.mode === 'offshore') {
+    const s = shoreFrom(x0, z0), tx = -s.nz, tz = s.nx;
+    for (let i = 0; i < w.n; i++) {
+      const off = (i - (w.n - 1) / 2) * w.sp, sp = shoreFrom(s.x + tx * off, s.z + tz * off);
+      if (w.mode === 'coast') pts.push({ x: sp.x - sp.nx * .4, z: sp.z - sp.nz * .4, y: 0 });
+      else for (let row = 0; row < 2; row++) pts.push({ x: sp.x + sp.nx * (2.2 + row * 1.4) + (row ? tx * .5 : 0), z: sp.z + sp.nz * (2.2 + row * 1.4) + (row ? tz * .5 : 0), y: 0, sea: true });
+    }
+  } else {
+    let guard = 0; while (pts.length < w.n && guard++ < 500) {
+      const x = x0 + (r() - .5) * 2 * w.r, z = z0 + (r() - .5) * 2 * w.r;
+      if (elevM(x, z) < 10 || pts.some(q => Math.hypot(q.x - x, q.z - z) < .9)) continue; pts.push({ x, z });
+    }
+  }
+  let cx = 0, cz = 0, rad = 0;
+  pts.forEach(q => { cx += q.x; cz += q.z; }); cx /= pts.length; cz /= pts.length;
+  pts.forEach(q => { rad = Math.max(rad, Math.hypot(q.x - cx, q.z - cz)); });
+  for (const q of pts) {
+    const t = turbineModel(); t.scale.setScalar(.95 + r() * .15);
+    if (q.sea) {
+      t.position.set(q.x, .0, q.z);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(.1, .13, .35, 8), mats.red); base.position.set(q.x, .02, q.z); layers.wind.add(base);
+    } else t.position.set(q.x, groundY(q.x, q.z), q.z);
+    layers.wind.add(t);
+  }
+  return { cx, cz, top: 2.9, rad: rad + 1 };
+}
+
+/* ── 올레길 ── */
+let olleCurve, beads = [];
+function buildOlle() {
+  const pts = [];
+  for (let i = 0; i < PN; i += 4) {
+    const n = polyNearest(PX[i], PZ[i]); let x = n.qx + n.nx * .8, z = n.qz + n.nz * .8, k = 0;
+    while (elevM(x, z) < 6 && k++ < 60) { x -= n.nx * .1; z -= n.nz * .1; }
+    x -= n.nx * .7; z -= n.nz * .7;
+    pts.push(new THREE.Vector3(x, groundY(x, z) + .09, z));
+  }
+  let curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
+  const dense = curve.getSpacedPoints(700).map(v => new THREE.Vector3(v.x, groundY(v.x, v.z) + .09, v.z)); dense.pop();
+  olleCurve = new THREE.CatmullRomCurve3(dense, true, 'centripetal');
+  const mat = new THREE.MeshBasicMaterial({ color: '#ff8a00', toneMapped: false });
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(olleCurve, 900, .055, 5, true), mat); layers.olle.add(tube);
+  const bm = new THREE.MeshBasicMaterial({ color: '#fff2c9', toneMapped: false });
+  for (let i = 0; i < 5; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(.14, 10, 8), bm); b.userData.u = i / 5; layers.olle.add(b); beads.push(b); }
+}
+
+/* ── 감귤 나무(인스턴스) ── */
+function buildCitrus() {
+  const r = mulberry32(21), pts = [];
+  for (let z = HZ + 4.5; z < 36; z += .21) for (let x = -40; x < 42; x += .21) {
+    const jx = x + (r() - .5) * .09, jz = z + (r() - .5) * .09, fx = (jx - X0) / STEP | 0, fz = (jz - Z0) / STEP | 0;
+    if (fx < 0 || fz < 0 || fx >= NX || fz >= NZ || !CIT[fz * NX + fx]) continue;
+    if (elevM(jx, jz) < 12) continue;
+    pts.push([jx, jz]);
+  }
+  const n = Math.min(pts.length, 14000);
+  const canopy = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.1, 0), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: .9, flatShading: true }), n);
+  const fruit = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.045, 0), new THREE.MeshStandardMaterial({ color: '#ff9a14', roughness: .5, emissive: '#7a3600', emissiveIntensity: .35 }), n);
+  const o = new THREE.Object3D(), c = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const [x, z] = pts[i], y = groundY(x, z);
+    o.position.set(x, y + .08, z); o.scale.set(1, .85 + r() * .25, 1); o.rotation.y = r() * 6; o.updateMatrix(); canopy.setMatrixAt(i, o.matrix);
+    c.setHSL(.27 + r() * .04, .5, .26 + r() * .08); canopy.setColorAt(i, c);
+    o.position.set(x + (r() - .5) * .1, y + .13 + r() * .03, z + .07); o.scale.setScalar(.9 + r() * .4); o.updateMatrix(); fruit.setMatrixAt(i, o.matrix);
+  }
+  layers.citrus.add(canopy, fruit);
+  CATS.citrus.count = n;
+}
+
+/* ── 구름 ── */
+const clouds = [];
+function buildClouds() {
+  const r = mulberry32(3), m = new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: .82, roughness: 1, flatShading: true, depthWrite: false });
+  for (let i = 0; i < 9; i++) {
+    const g = new THREE.Group(), n = 4 + (r() * 4 | 0);
+    for (let k = 0; k < n; k++) { const s = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 + r() * 1.4, 1), m); s.position.set((k - n / 2) * 1.8 + r(), r() * .7, (r() - .5) * 2); s.scale.y = .55; g.add(s); }
+    g.position.set((r() - .5) * 110, 11 + r() * 5, (r() - .5) * 60 + 4); layers.cloud.add(g); clouds.push({ o: g, v: .25 + r() * .3 });
+  }
+}
+
+/* 백록담 호수 */
+function buildCrater() {
+  const y = mY(1900) + .006;
+  const lake = new THREE.Mesh(new THREE.CircleGeometry(.34, 28), new THREE.MeshStandardMaterial({ color: '#3aa4d8', roughness: .1, metalness: .2, emissive: '#0a3a58', emissiveIntensity: .4 }));
+  lake.rotation.x = -Math.PI / 2; lake.position.set(HX, y, HZ); scene.add(lake);
+}
+const selRing = new THREE.Mesh(new THREE.RingGeometry(.55, .7, 40), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: .95, depthTest: false, toneMapped: false }));
+selRing.rotation.x = -Math.PI / 2; selRing.renderOrder = 10; selRing.visible = false; scene.add(selRing);
+
+/* ───────────── 관람객 데이터 + 3D 막대 ───────────── */
+const NAMES = SITES;
+let VIS = null, monthIdx = 0, playing = false, playTimer = 0;
+const bars = [];   // {poi, mesh, cur, target, el}
+const fmtN = n => (n === null || n === undefined ? '–' : n.toLocaleString('ko-KR'));
+const pad = n => String(n).padStart(2, '0');
+const num = v => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
+let maxVal = 1;
+
+function buildBars() {
+  const lab = $('#labels');
+  for (const p of P.filter(q => q.site)) {
+    const geo = new THREE.CylinderGeometry(.3, .3, 1, 14).translate(0, .5, 0);
+    const mat = new THREE.MeshStandardMaterial({ color: '#e0245e', emissive: '#7a0b2c', emissiveIntensity: .4, roughness: .45 });
+    const m = new THREE.Mesh(geo, mat), x = p.base.x + .55, z = p.base.z + .55;
+    m.position.set(x, groundY(x, z), z); m.scale.y = .001; layers.bars.add(m);
+    const el = document.createElement('div'); el.className = 'vbar'; el.style.opacity = 0; lab.appendChild(el);
+    bars.push({ p, mesh: m, cur: 0, target: 0, el, anchor: new THREE.Vector3(x, 0, z) });
+  }
+}
+function barHeightFor(v) { return v === null ? 0 : Math.max(.05, v / maxVal * 8.5); }
+function applyMonth() {
+  if (!VIS) return;
+  const row = VIS.rows[monthIdx];
+  bars.forEach(b => {
+    const i = VIS.names.indexOf(b.p.site), v = i < 0 ? null : row.v[i];
+    b.v = v; b.target = barHeightFor(v);
+    const t = v === null ? 0 : Math.min(1, v / maxVal);
+    b.mesh.material.color.setHSL(.62 - t * .6, .8, .5); b.mesh.material.emissive.setHSL(.62 - t * .6, .8, .22);
+  });
+  const total = row.v.reduce((a, v) => a + (v ?? 0), 0);
+  $('#ymLabel').textContent = row.ym.replace('-', '.');
+  $('#ymTotal').textContent = `6곳 합계 ${fmtN(total)}명`;
+  if (selected && selected.site) showInfo(selected, true);
+}
+function setupDataUI() {
+  const rows = VIS.rows; maxVal = 1; rows.forEach(r => r.v.forEach(v => { if (v && v > maxVal) maxVal = v; }));
+  monthIdx = rows.length - 1;
+  $('#data').innerHTML = `<span class="ttl">📊 월별 관람객 3D 막대</span>
+    <button id="playBtn" aria-label="재생">▶</button>
+    <input id="monthRange" type="range" min="0" max="${rows.length - 1}" value="${monthIdx}" aria-label="월 선택" />
+    <span class="ym" id="ymLabel"></span><span class="msg" id="ymTotal" style="flex:none;min-width:0"></span>`;
+  $('#monthRange').oninput = e => { monthIdx = +e.target.value; applyMonth(); };
+  $('#playBtn').onclick = () => {
+    playing = !playing; $('#playBtn').textContent = playing ? '❚❚' : '▶';
+    clearInterval(playTimer); if (playing) { if (monthIdx >= rows.length - 1) monthIdx = 0; playTimer = setInterval(() => { monthIdx = (monthIdx + 1) % rows.length; $('#monthRange').value = monthIdx; applyMonth(); }, 650); }
+  };
+  applyMonth();
+}
+function showKeyForm(why) {
+  $('#data').innerHTML = `<span class="ttl">📊 관람객 막대</span><span class="msg">${esc(why)} 공공데이터포털 인증키를 입력하면 직접 불러옵니다 (이 브라우저에만 저장).</span>
+    <input id="keyIn" type="password" placeholder="서비스키(Decoding/Encoding 모두 가능)" autocomplete="off" /><button id="keyGo">불러오기</button>`;
+  $('#keyGo').onclick = async () => { const k = $('#keyIn').value.trim(); if (!k) return; try { localStorage.setItem('odcloudKey', k); } catch {} await loadVisitors(); };
+}
+async function loadVisitors() {
+  $('#data').innerHTML = '<span class="ttl">📊 관람객 막대</span><span class="msg">불러오는 중…</span>';
+  let why = '';
+  if (location.protocol.startsWith('http')) {
+    try { const r = await fetch('/api/visitors'); if (r.ok) { const j = await r.json(); if (j.rows?.length) { VIS = j; return setupDataUI(); } } else { const j = await r.json().catch(() => ({})); why = j.error || `서버 응답 ${r.status}.`; } } catch (e) { why = '서버 API에 연결할 수 없어요.'; }
+  }
+  let key = ''; try { key = localStorage.getItem('odcloudKey') || ''; } catch {}
+  if (key) {
+    try {
+      let k = key; try { k = decodeURIComponent(key); } catch {}
+      const q = new URLSearchParams({ page: '1', perPage: '500', returnType: 'JSON', serviceKey: k });
+      const r = await fetch(`https://api.odcloud.kr/api/15125100/v1/uddi:32a1b877-af20-4505-a76a-fd389ebd30ca?${q}`);
+      const j = await r.json(); if (!Array.isArray(j.data)) throw new Error(j.msg || '응답 형식 오류');
+      const rows = j.data.map(r => ({ ym: `${r['기준연도']}-${pad(r['기준월'])}`, v: NAMES.map(n => num(r[n])) })).sort((a, b) => a.ym.localeCompare(b.ym));
+      if (!rows.length) throw new Error('데이터가 비어 있어요');
+      VIS = { names: NAMES, rows }; return setupDataUI();
+    } catch (e) { why = `직접 호출 실패(${e.message}).`; }
+  }
+  showKeyForm(why || '관람객 데이터를 불러오지 못했어요.');
+}
+
+/* ───────────── UI: 레이어, 목록, 라벨, 정보 ───────────── */
+let selected = null, hovered = null;
+function buildUI() {
+  const counts = {}; P.forEach(p => counts[p.cat] = (counts[p.cat] || 0) + 1);
+  counts.citrus = (CATS.citrus.count || 0) ? `${counts.citrus}곳` : counts.citrus;
+  $('#layerList').innerHTML = Object.entries(CATS).map(([k, c]) => `<label class="layer"><input type="checkbox" data-layer="${k}" checked /><span class="dot" style="background:${c.color}"></span>${c.icon} ${c.label}<span class="n">${counts[k] ?? ''}</span></label>`).join('');
+  $('#layerList').addEventListener('change', e => { const k = e.target.dataset.layer; if (!k) return; layerOn[k] = e.target.checked; layers[k].visible = e.target.checked; if (selected && selected.cat === k && !e.target.checked) closeInfo(); });
+  $('#poiList').innerHTML = Object.entries(CATS).filter(([k]) => P.some(p => p.cat === k)).map(([k, c]) =>
+    `<details ${k === 'spot' ? 'open' : ''}><summary>${c.icon} ${c.label}</summary>${P.filter(p => p.cat === k).map(p => `<button data-poi="${p.id}">${esc(p.name)}</button>`).join('')}</details>`).join('');
+  $('#poiList').addEventListener('click', e => { const b = e.target.closest('[data-poi]'); if (b) selectPOI(poiById[b.dataset.poi], true); });
+  $('#panelToggle').onclick = () => { const c = $('#panel').classList.toggle('collapsed'); $('#panelToggle').textContent = c ? '+' : '–'; };
+  if (innerWidth < 760) $('#panelToggle').click();
+  const lab = $('#labels');
+  for (const p of P) {
+    const el = document.createElement('div'); el.className = 'lbl'; el.style.setProperty('--c', CATS[p.cat].color); el.textContent = `${CATS[p.cat].icon} ${p.name}`;
+    el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; el.onclick = () => selectPOI(p, true);
+    el.onpointerenter = () => { hovered = p; }; el.onpointerleave = () => { if (hovered === p) hovered = null; };
+    lab.appendChild(el); labelEls[p.id] = el;
+  }
+  document.querySelectorAll('#toolbar [data-view]').forEach(b => b.onclick = () => flyPreset(b.dataset.view));
+  $('#btnSpin').onclick = () => setSpin(!controls.autoRotate);
+  $('#btnNight').onclick = () => { night = night ? 0 : 1; $('#btnNight').textContent = night ? '☀️ 낮으로' : '🌙 밤으로'; document.documentElement.classList.toggle('night', !!night); };
+  setSpin(true);
+}
+function setSpin(on) { controls.autoRotate = on; $('#btnSpin').classList.toggle('on', on); }
+controls.addEventListener('start', () => { setSpin(false); fly = null; $('#hint').style.opacity = 0; });
+
+function spark(vals, cur) {
+  const w = 280, h = 56, ok = vals.filter(v => v !== null), mx = Math.max(1, ...ok);
+  const pts = vals.map((v, i) => v === null ? null : [i / Math.max(1, vals.length - 1) * (w - 8) + 4, h - 6 - v / mx * (h - 14)]);
+  const line = pts.filter(Boolean).map(p => p.join(',')).join(' '), c = pts[cur];
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${line}" fill="none" stroke="#e0245e" stroke-width="2" vector-effect="non-scaling-stroke"/>${c ? `<circle cx="${c[0]}" cy="${c[1]}" r="4" fill="#e0245e"/>` : ''}</svg>`;
+}
+function showInfo(p, keep) {
+  const c = CATS[p.cat], el = $('#info');
+  let vis = '';
+  if (p.site && VIS) {
+    const i = VIS.names.indexOf(p.site), from = Math.max(0, monthIdx - 23), vals = VIS.rows.slice(from, monthIdx + 1).map(r => r.v[i]);
+    const v = VIS.rows[monthIdx].v[i], sum12 = VIS.rows.slice(Math.max(0, monthIdx - 11), monthIdx + 1).reduce((a, r) => a + (r.v[i] ?? 0), 0);
+    vis = `<div class="vis">${VIS.rows[monthIdx].ym.replace('-', '.')} 관람객<br><b>${v === null ? '미집계' : fmtN(v) + '명'}</b> <span style="opacity:.65">· 최근 12개월 ${fmtN(sum12)}명</span>${spark(vals, vals.length - 1)}</div>`;
+  }
+  el.innerHTML = `<button class="x" aria-label="닫기">✕</button><span class="tag" style="background:${c.color}">${c.icon} ${c.label}${p.kind ? ' · ' + p.kind : ''}</span><h2>${esc(p.name)}</h2><p>${esc(p.desc)}</p>${p.meta ? `<div class="meta">${p.meta.map(m => `<span>${esc(m)}</span>`).join('')}</div>` : ''}${vis}`;
+  el.querySelector('.x').onclick = closeInfo; el.classList.remove('hidden');
+}
+function closeInfo() { selected = null; $('#info').classList.add('hidden'); selRing.visible = false; }
+function selectPOI(p, fly_) {
+  if (!layerOn[p.cat]) { layerOn[p.cat] = true; layers[p.cat].visible = true; const cb = document.querySelector(`[data-layer="${p.cat}"]`); if (cb) cb.checked = true; }
+  selected = p; showInfo(p);
+  selRing.position.set(p.base.x, p.base.y + .06, p.base.z); selRing.visible = true;
+  if (fly_) flyTo(p.base.clone(), p.cat === 'wind' ? 14 : p.big ? 24 : 14, .9);
+}
+
+/* ───────────── 카메라 이동 ───────────── */
+let fly = null;
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function flyTo(target, dist, pol = .9) {
+  const dir = camera.position.clone().sub(controls.target), az = Math.atan2(dir.x, dir.z);
+  const to = new THREE.Vector3(target.x + Math.sin(az) * dist * Math.sin(pol), target.y + dist * Math.cos(pol), target.z + Math.cos(az) * dist * Math.sin(pol));
+  fly = { t: 0, p0: camera.position.clone(), t0: controls.target.clone(), p1: to, t1: target.clone() };
+}
+function flyPreset(k) {
+  const pp = name => P.find(p => p.name.startsWith(name)).base;
+  const set = { all: [new THREE.Vector3(0, 0, 2), 98, .62], halla: [new THREE.Vector3(HX, mY(1000), HZ), 26, .85], seogwipo: [new THREE.Vector3((pp('천지연').x + pp('천제연').x) / 2, 0, pp('천지연').z - 1), 30, .78], seongsan: [new THREE.Vector3(pp('성산일출봉').x - 2, 0, pp('성산일출봉').z - 1), 24, .8], west: [new THREE.Vector3(toX(126.22), 0, toZ(33.37)), 28, .8] }[k];
+  if (set) { flyTo(set[0], set[1], set[2]); setSpin(false); }
+}
+
+/* ───────────── 라벨 투영 / 피킹 ───────────── */
+const v3 = new THREE.Vector3(), rc = new THREE.Raycaster(), mouse = new THREE.Vector2();
+function occluded(a) {
+  const c = camera.position;
+  for (let k = 1; k <= 14; k++) { const t = k / 15, x = c.x + (a.x - c.x) * t, y = c.y + (a.y - c.y) * t, z = c.z + (a.z - c.z) * t; if (mY(elevM(x, z)) > y + .15) return true; }
+  return false;
+}
+function updateLabels() {
+  const W = innerWidth, Hh = innerHeight;
+  for (const p of P) {
+    const el = labelEls[p.id], cat = CATS[p.cat];
+    const dist = camera.position.distanceTo(p.anchor), show = layerOn[p.cat] && (dist < cat.maxD || p === selected || p === hovered);
+    v3.copy(p.anchor).project(camera);
+    if (!show || v3.z > 1 || Math.abs(v3.x) > 1.1 || Math.abs(v3.y) > 1.1) { el.style.display = 'none'; continue; }
+    const occ = occluded(p.anchor);
+    el.style.display = ''; el.style.opacity = occ ? 0 : 1; el.style.pointerEvents = occ ? 'none' : 'auto';
+    el.classList.toggle('hl', p === selected || p === hovered);
+    el.style.transform = `translate(${(v3.x * .5 + .5) * W + 6}px, ${(-v3.y * .5 + .5) * Hh - 14}px)`;
+    el.style.zIndex = Math.round(1000 - dist);
+  }
+  for (const b of bars) {
+    const on = layerOn.bars && b.v !== undefined && b.v !== null;
+    v3.set(b.anchor.x, b.mesh.position.y + b.mesh.scale.y + .4, b.anchor.z).project(camera);
+    if (!on || v3.z > 1 || camera.position.distanceTo(b.mesh.position) > 70) { b.el.style.opacity = 0; continue; }
+    b.el.textContent = fmtN(b.v); b.el.style.opacity = 1;
+    b.el.style.transform = `translate(${(v3.x * .5 + .5) * W - 18}px, ${(-v3.y * .5 + .5) * Hh - 12}px)`;
+  }
+}
+function activeHits() { return hitMeshes.filter(h => layerOn[h.userData.poi.cat]); }
+function pick(ev) {
+  mouse.set(ev.clientX / innerWidth * 2 - 1, -(ev.clientY / innerHeight) * 2 + 1); rc.setFromCamera(mouse, camera);
+  const hits = rc.intersectObjects(activeHits(), false); return hits.length ? hits[0].object.userData.poi : null;
+}
+let downAt = null;
+canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => { if (!downAt) return; const moved = Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5; downAt = null; if (moved) return; const p = pick(e); if (p) selectPOI(p, true); else closeInfo(); });
+let moveQueued = false;
+canvas.addEventListener('pointermove', e => { if (e.buttons || moveQueued) return; moveQueued = true; requestAnimationFrame(() => { moveQueued = false; const p = pick(e); hovered = p; canvas.style.cursor = p ? 'pointer' : ''; }); });
+
+/* ───────────── 루프 ───────────── */
+let night = 0, nightT = 0;
+const clock = new THREE.Clock();
+function frame() {
+  const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+  if (fly) { fly.t = Math.min(1, fly.t + dt / 1.4); const e = ease(fly.t); camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.t0, fly.t1, e); if (fly.t >= 1) fly = null; }
+  controls.update();
+  nightT += (night - nightT) * Math.min(1, dt * 2.5);
+  scene.background.lerpColors(SKY_DAY, SKY_NIGHT, nightT); scene.fog.color.copy(scene.background);
+  hemi.intensity = 1.15 - nightT * .7; sun.intensity = 2.6 - nightT * 2.0; sun.color.set(nightT > .5 ? '#7f95d6' : '#fff1d2'); renderer.toneMappingExposure = 1.05 + nightT * .25;
+  water.material.color.lerpColors(C('#2a95bd'), C('#10305a'), nightT);
+  lampMat.emissiveIntensity = .6 + nightT * 3; beams.forEach(b => { b.o.rotation.y = t * 1.1; b.m.opacity = .14 + nightT * .5; });
+  spinners.forEach(s => s.o.rotation.z += dt * s.s * 1.6);
+  bobbers.forEach(b => { b.o.position.y = b.y0 + Math.sin(t * 2 + b.ph) * .1; b.o.rotation.y += dt * .8; });
+  boats.forEach(b => { b.o.position.y = Math.sin(t * 1.6 + b.ph) * .015; b.o.rotation.z = Math.sin(t * 1.3 + b.ph) * .05; });
+  clouds.forEach(c => { c.o.position.x += c.v * dt; if (c.o.position.x > 70) c.o.position.x = -70; });
+  beads.forEach(b => { b.userData.u = (b.userData.u + dt * .012) % 1; b.position.copy(olleCurve.getPointAt(b.userData.u)); b.position.y += .05; });
+  bars.forEach(b => { b.cur += (b.target - b.cur) * Math.min(1, dt * 4); b.mesh.scale.y = Math.max(.001, b.cur); b.mesh.visible = layerOn.bars; });
+  if (selRing.visible) { const s = 1 + Math.sin(t * 4) * .12; selRing.scale.set(s, s, s); }
+  const wp = water.geometry.attributes.position;
+  for (let i = 0; i < wp.count; i++) { const x = waterBase[i * 3], z = waterBase[i * 3 + 2]; wp.array[i * 3 + 1] = Math.sin(x * .35 + t * 1.1) * .025 + Math.cos(z * .3 + t * .9) * .025; }
+  wp.needsUpdate = true;
+  renderer.render(scene, camera);
+  updateLabels();
+  requestAnimationFrame(frame);
+}
+
+/* ───────────── 시작 ───────────── */
+setTimeout(() => {
+  try {
+    buildGrid(); buildTerrain(); buildWater(); buildCrater(); buildClouds();
+    placePOIs(); buildOlle(); buildCitrus(); buildBars(); buildUI();
+    frame(); loadVisitors();
+    setTimeout(() => $('#loading').classList.add('done'), 150);
+    setTimeout(() => { $('#hint').style.opacity = 0; }, 9000);
+  } catch (e) { console.error(e); $('#loading').innerHTML = '<div>⚠️ 3D 지도를 그리지 못했어요.<br>' + esc(e.message) + '</div>'; }
+}, 60);
+</script>
+</body>
+</html>
