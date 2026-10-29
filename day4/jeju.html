@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>제주목관아</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #f3d58a; }
+  #title { position: fixed; left: 24px; top: 20px; color: #7a4f1d; font-family: system-ui, "Malgun Gothic", sans-serif; pointer-events: none; }
+  #title b { display: block; font-size: 26px; letter-spacing: 2px; }
+  #title span { font-size: 13px; letter-spacing: 3px; opacity: .75; }
+  #hint { position: fixed; left: 24px; bottom: 16px; color: #7a4f1d; opacity: .7; font: 13px system-ui, "Malgun Gothic", sans-serif; pointer-events: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="title"><b>제주목관아</b><span>濟州牧官衙 · JEJU MOKGWANA</span></div>
+<div id="hint">드래그: 회전 · 휠: 확대/축소</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const BG = 0xf3d58a;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(BG);
+scene.fog = new THREE.Fog(BG, 60, 120);
+
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 300);
+camera.position.set(28, 22, 30);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1, 0);
+controls.enableDamping = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.5;
+controls.minDistance = 20;
+controls.maxDistance = 80;
+controls.maxPolarAngle = Math.PI * 0.47;
+
+// ---------- 조명 ----------
+scene.add(new THREE.HemisphereLight(0xfff4d6, 0xc9a86a, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+sun.position.set(16, 28, 12);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, near: 1, far: 80 });
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+
+// ---------- 헬퍼 ----------
+const mats = new Map();
+const mat = c => { if (!mats.has(c)) mats.set(c, new THREE.MeshLambertMaterial({ color: c })); return mats.get(c); };
+function add(parent, geo, c, x, y, z, shadow = true) {
+  const m = new THREE.Mesh(geo, mat(c));
+  m.position.set(x, y, z);
+  m.castShadow = shadow; m.receiveShadow = true;
+  parent.add(m);
+  return m;
+}
+const box = (p, w, h, d, c, x, y, z) => add(p, new THREE.BoxGeometry(w, h, d), c, x, y, z);
+
+const C = {
+  grass: 0x9bd27a, sand: 0xf1deb0, sea: 0x58b6e8, soil: 0x7a604a, rock: 0x4f4c57,
+  basalt: 0x55555e, tile: 0x454b58, tileCap: 0x2d323c, red: 0xc2453a, cream: 0xf1e6cf,
+  door: 0x8a5a38, green: 0x2f7d6b, stone: 0x9a9aa2, court: 0xe3dac2, path: 0xbdb3a0,
+};
+
+// ---------- 섬 ----------
+const island = new THREE.Group();
+scene.add(island);
+box(island, 26, 0.8, 19, C.grass, 0, -0.4, -3.5);
+box(island, 26, 0.8, 2, C.sand, 0, -0.45, 7);
+const seaMesh = box(island, 26, 0.8, 5, C.sea, 0, -0.75, 10.5);
+seaMesh.castShadow = false;
+box(island, 26, 1.6, 26, C.soil, 0, -1.6, 0);
+box(island, 22.4, 2, 22.4, C.rock, 0, -3.4, 0);
+box(island, 17, 2, 17, 0x3b3943, 0, -5.4, 0);
+
+// ---------- 지붕 ----------
+function gableRoof(len, span, rh, color) {
+  const s = new THREE.Shape();
+  s.moveTo(-span / 2, 0);
+  s.quadraticCurveTo(-span * 0.18, rh * 0.18, 0, rh);
+  s.quadraticCurveTo(span * 0.18, rh * 0.18, span / 2, 0);
+  s.lineTo(-span / 2, 0);
+  const g = new THREE.ExtrudeGeometry(s, { depth: len, bevelEnabled: false });
+  g.translate(0, 0, -len / 2);
+  const m = new THREE.Mesh(g, mat(color));
+  m.rotation.y = Math.PI / 2; // 용마루가 x축을 따르도록
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+function hipRoof(a, b, H, color) {
+  const pts = [];
+  const R = a * Math.SQRT2;
+  for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push(new THREE.Vector2(R * (1 - t), H * Math.pow(t, 1.7))); }
+  const m = new THREE.Mesh(new THREE.LatheGeometry(pts, 4), new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
+  m.rotation.y = Math.PI / 4;
+  m.scale.z = b / a;
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+
+// ---------- 건물 ----------
+function pillars(g, w, d, h, y0, n, zFront, zBack) {
+  for (let i = 0; i < n; i++) {
+    const x = -w / 2 + 0.3 + (w - 0.6) * i / (n - 1);
+    box(g, 0.28, h, 0.28, C.red, x, y0 + h / 2, zFront);
+    box(g, 0.28, h, 0.28, C.red, x, y0 + h / 2, zBack);
+  }
+}
+function gableHall(w, d, h, { gate = false } = {}) {
+  const g = new THREE.Group(), y0 = 0.5;
+  box(g, w + 0.8, 0.5, d + 0.8, C.stone, 0, 0.25, 0);
+  const zF = d / 2 - 0.2, zB = -d / 2 + 0.2;
+  const n = Math.max(3, Math.round(w / 1.8));
+  pillars(g, w, d, h, y0, n, zF, zB);
+  if (gate) {
+    box(g, w * 0.4, h * 0.8, 0.12, C.door, 0, y0 + h * 0.4, 0);
+    box(g, 0.06, h * 0.8, 0.14, C.cream, 0, y0 + h * 0.4, 0);
+  } else {
+    box(g, w - 0.5, h, 0.14, C.cream, 0, y0 + h / 2, zB + 0.1);
+    box(g, 0.14, h, d - 0.5, C.cream, -w / 2 + 0.35, y0 + h / 2, 0);
+    box(g, 0.14, h, d - 0.5, C.cream, w / 2 - 0.35, y0 + h / 2, 0);
+    box(g, w - 0.6, h * 0.82, 0.12, C.door, 0, y0 + h * 0.41, zF - 0.1);
+    for (let i = 1; i < n - 1; i++) box(g, 0.07, h * 0.82, 0.14, C.cream, -w / 2 + 0.3 + (w - 0.6) * i / (n - 1), y0 + h * 0.41, zF - 0.1);
+  }
+  box(g, w + 0.2, 0.3, d + 0.2, C.green, 0, y0 + h + 0.15, 0);
+  const roof = gableRoof(w + 1.6, d + 1.8, 1.7 + w * 0.05, C.tile);
+  roof.position.y = y0 + h + 0.3;
+  g.add(roof);
+  box(g, w + 1.8, 0.2, 0.4, C.tileCap, 0, y0 + h + 0.3 + 1.7 + w * 0.05, 0);
+  return g;
+}
+function pavilion(w, d, h) {
+  const g = new THREE.Group(), y0 = 0.5;
+  box(g, w + 0.8, 0.5, d + 0.8, C.stone, 0, 0.25, 0);
+  box(g, w, 0.08, d, 0xd9b27c, 0, 0.54, 0);
+  for (const sx of [-1, 1]) for (const sz of [-1, 0, 1]) box(g, 0.28, h, 0.28, C.red, sx * (w / 2 - 0.2), y0 + h / 2, sz * (d / 2 - 0.2));
+  box(g, w + 0.3, 0.3, d + 0.3, C.green, 0, y0 + h + 0.15, 0);
+  box(g, w * 0.9, 0.12, 0.12, C.red, 0, y0 + h * 0.75, d / 2 - 0.2);
+  const roof = hipRoof(w / 2 + 1, d / 2 + 1, 2.6, C.tile);
+  roof.position.y = y0 + h + 0.3;
+  g.add(roof);
+  add(g, new THREE.CylinderGeometry(0.06, 0.14, 0.5, 8), C.tileCap, 0, y0 + h + 0.3 + 2.6 + 0.1, 0);
+  return g;
+}
+
+// ---------- 관아 배치 ----------
+const complex = new THREE.Group();
+island.add(complex);
+
+box(complex, 16, 0.1, 12, C.court, 0, 0.05, -3);
+box(complex, 2, 0.12, 8, C.path, 0, 0.06, 0.9);
+
+function wall(w, d, x, z) {
+  box(complex, w, 1.3, d, C.basalt, x, 0.65, z);
+  box(complex, w + (w > d ? 0.2 : 0.6), 0.22, d + (w > d ? 0.6 : 0.2), C.tileCap, x, 1.41, z);
+}
+wall(16.5, 0.5, 0, -9);
+wall(0.5, 12, -8, -3);
+wall(0.5, 12, 8, -3);
+wall(5.5, 0.5, -5.25, 3);
+wall(5.5, 0.5, 5.25, 3);
+
+const gate = gableHall(5, 2.4, 2.2, { gate: true });
+gate.position.set(0, 0, 3);
+complex.add(gate);
+
+const mainHall = gableHall(9, 5, 2.6);
+mainHall.position.set(0, 0, -5.6);
+complex.add(mainHall);
+
+for (const s of [-1, 1]) {
+  const side = gableHall(5.5, 3, 2.1);
+  side.position.set(s * 5.2, 0, -1.4);
+  side.rotation.y = s * Math.PI / 2;
+  complex.add(side);
+}
+
+const gwan = pavilion(3.8, 3.4, 2.4);
+gwan.position.set(10.6, 0, 4.4);
+island.add(gwan);
+
+// ---------- 돌하르방 ----------
+function hareubang(x, z, rot) {
+  const g = new THREE.Group();
+  add(g, new THREE.CylinderGeometry(0.36, 0.46, 0.95, 10), 0x5c5c63, 0, 0.48, 0);
+  add(g, new THREE.SphereGeometry(0.4, 16, 12), 0x66666e, 0, 1.2, 0);
+  add(g, new THREE.CylinderGeometry(0.3, 0.38, 0.26, 12), 0x55555d, 0, 1.58, 0);
+  box(g, 0.12, 0.2, 0.14, 0x5c5c63, 0, 1.17, 0.4);
+  box(g, 0.16, 0.34, 0.16, 0x5c5c63, 0.36, 0.7, 0.2);
+  box(g, 0.16, 0.34, 0.16, 0x5c5c63, -0.36, 0.7, 0.2);
+  g.position.set(x, 0, z);
+  g.rotation.y = rot;
+  island.add(g);
+}
+hareubang(-3.2, 4.4, 0.3);
+hareubang(3.2, 4.4, -0.3);
+
+// ---------- 나무 (귤나무 / 소나무) ----------
+const crowns = [];
+function tangerineTree(x, z, s = 1) {
+  const g = new THREE.Group();
+  add(g, new THREE.CylinderGeometry(0.12, 0.18, 0.9, 8), 0x7b5230, 0, 0.45, 0);
+  const crown = new THREE.Group();
+  crown.position.y = 1.4;
+  add(crown, new THREE.IcosahedronGeometry(0.95, 1), 0x5fb85a, 0, 0, 0).material = new THREE.MeshLambertMaterial({ color: 0x5fb85a, flatShading: true });
+  for (let i = 0; i < 9; i++) {
+    const a = Math.random() * Math.PI * 2, b = Math.acos(Math.random() * 1.6 - 0.8);
+    add(crown, new THREE.SphereGeometry(0.15, 10, 8), 0xff9a1f, Math.sin(b) * Math.cos(a) * 0.92, Math.cos(b) * 0.92, Math.sin(b) * Math.sin(a) * 0.92);
+  }
+  g.add(crown);
+  g.position.set(x, 0, z); g.scale.setScalar(s);
+  island.add(g);
+  crowns.push({ crown, phase: Math.random() * 6 });
+}
+function pine(x, z, s = 1) {
+  const g = new THREE.Group();
+  add(g, new THREE.CylinderGeometry(0.12, 0.2, 1.4, 8), 0x6e4a2a, 0, 0.7, 0);
+  for (let i = 0; i < 3; i++) {
+    const m = add(g, new THREE.ConeGeometry(1.0 - i * 0.22, 1.0, 7), 0x3f9a5a, 0, 1.6 + i * 0.7, 0);
+    m.material = new THREE.MeshLambertMaterial({ color: 0x3f9a5a, flatShading: true });
+  }
+  g.position.set(x, 0, z); g.scale.setScalar(s);
+  island.add(g);
+}
+[[-6.8, 2.2], [6.8, 2.2], [-10.5, 2.5], [-11.2, -3.5], [11, -4.2], [-5.6, 5.2, 0.9], [5.6, 5, 0.9], [11.5, -0.5, 0.9]].forEach(([x, z, s]) => tangerineTree(x, z, s || 1));
+[[-11, -7, 1.1], [11.2, -8, 1], [-1, -10.8, 0.9], [4, -11, 0.8]].forEach(([x, z, s]) => pine(x, z, s));
+
+// ---------- 한라산 & 오름 ----------
+const halla = new THREE.Group();
+{
+  const flat = c => new THREE.MeshLambertMaterial({ color: c, flatShading: true });
+  const a = add(halla, new THREE.CylinderGeometry(2.6, 4.2, 4.6, 14), 0x7dbb6a, 0, 2.3, 0); a.material = flat(0x7dbb6a);
+  const b = add(halla, new THREE.CylinderGeometry(1.4, 2.6, 2.4, 14), 0xa08f72, 0, 5.8, 0); b.material = flat(0xa08f72);
+  add(halla, new THREE.CylinderGeometry(1.1, 1.4, 0.5, 14), 0xb7a888, 0, 7.25, 0);
+  add(halla, new THREE.CylinderGeometry(0.8, 0.8, 0.12, 14), 0x6fd0d8, 0, 7.45, 0);
+  halla.position.set(-8.6, 0, -9.8);
+}
+island.add(halla);
+const oreum = add(island, new THREE.SphereGeometry(3, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), 0x8fcf72, 8, 0, -10.2);
+oreum.scale.y = 0.55;
+
+// ---------- 군졸 ----------
+const guards = [];
+function guard(color, off) {
+  const g = new THREE.Group();
+  add(g, new THREE.CylinderGeometry(0.17, 0.22, 0.6, 10), color, 0, 0.45, 0);
+  add(g, new THREE.SphereGeometry(0.16, 12, 10), 0xf3c9a0, 0, 0.88, 0);
+  add(g, new THREE.CylinderGeometry(0.3, 0.3, 0.03, 14), 0x1d1d22, 0, 1.02, 0);
+  add(g, new THREE.CylinderGeometry(0.12, 0.14, 0.2, 10), 0x1d1d22, 0, 1.12, 0);
+  add(g, new THREE.CylinderGeometry(0.02, 0.02, 1.5, 6), 0x8a6a3a, 0.28, 0.75, 0.05);
+  island.add(g);
+  guards.push({ g, off });
+}
+guard(0xd04a4a, 0); guard(0x3a6fc4, 0.34); guard(0xd04a4a, 0.67);
+const LX = 2.8, Z0 = -1.8, Z1 = 2.1, PER = 2 * (2 * LX) + 2 * (Z1 - Z0);
+function rectPos(u, out) {
+  let s = (u % 1) * PER;
+  const w = 2 * LX, h = Z1 - Z0;
+  if (s < w) { out.set(-LX + s, 0, Z0); return 0; } s -= w;
+  if (s < h) { out.set(LX, 0, Z0 + s); return Math.PI / 2; } s -= h;
+  if (s < w) { out.set(LX - s, 0, Z1); return Math.PI; } s -= w;
+  out.set(-LX, 0, Z1 - s); return -Math.PI / 2;
+}
+
+// ---------- 배 & 파도 ----------
+const boat = new THREE.Group();
+box(boat, 0.7, 0.4, 1.8, 0xb5651d, 0, 0.1, 0);
+box(boat, 0.1, 1.6, 0.1, 0x6b4a2a, 0, 1, 0);
+{
+  const s = new THREE.Shape();
+  s.moveTo(-0.7, 0); s.lineTo(0.7, 0); s.lineTo(0, 1.4); s.lineTo(-0.7, 0);
+  const sail = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: 0.04, bevelEnabled: false }), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }));
+  sail.rotation.y = Math.PI / 2; sail.position.set(0, 0.5, 0); sail.castShadow = true;
+  boat.add(sail);
+}
+island.add(boat);
+const waves = [];
+for (let i = 0; i < 9; i++) {
+  const w = box(island, 1.2 + Math.random(), 0.05, 0.12, 0xe9f7ff, -12 + Math.random() * 24, -0.33, 8.6 + Math.random() * 4);
+  w.castShadow = false; waves.push(w);
+}
+
+// ---------- 열기구 & 구름 ----------
+const balloons = [];
+[[0xff9f2e, 0], [0xff8fa3, 2.1], [0x5ecfc7, 4.2]].forEach(([color, ph], i) => {
+  const g = new THREE.Group();
+  const b = add(g, new THREE.SphereGeometry(1.1, 20, 16), color, 0, 2.2, 0); b.scale.y = 1.2;
+  add(g, new THREE.CylinderGeometry(0.35, 0.2, 0.5, 10), color, 0, 0.7, 0);
+  box(g, 0.5, 0.35, 0.5, 0x8a5a38, 0, 0, 0);
+  for (const [dx, dz] of [[-.2, -.2], [.2, -.2], [-.2, .2], [.2, .2]]) add(g, new THREE.CylinderGeometry(0.015, 0.015, 0.75, 4), 0x5a4020, dx * 1.2, 0.5, dz * 1.2, false);
+  scene.add(g);
+  balloons.push({ g, ph, r: 15 + i * 2.5, y: 9 + i * 1.6 });
+});
+const clouds = [];
+for (let i = 0; i < 6; i++) {
+  const g = new THREE.Group();
+  [[0, 0, 1.4], [1.3, -0.2, 1.1], [-1.3, -0.15, 1], [0.5, 0.5, 0.9]].forEach(([x, y, r]) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x777777 }));
+    m.position.set(x, y, 0); g.add(m);
+  });
+  g.position.set(-40 + i * 16, 13 + Math.random() * 4, -14 + Math.random() * 26);
+  scene.add(g);
+  clouds.push({ g, speed: 0.6 + Math.random() * 0.5 });
+}
+
+// ---------- 루프 ----------
+const clock = new THREE.Clock();
+const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
+renderer.setAnimationLoop(() => {
+  const t = clock.getElapsedTime();
+
+  guards.forEach(({ g, off }) => {
+    const rot = rectPos(t * 0.02 + off, tmp);
+    g.position.set(tmp.x, Math.abs(Math.sin(t * 6 + off * 9)) * 0.06, tmp.z);
+    g.rotation.y = rot;
+  });
+
+  crowns.forEach(({ crown, phase }) => {
+    const k = 1 + Math.sin(t * 1.5 + phase) * 0.03;
+    crown.scale.set(k, 2 - k, k);
+  });
+
+  const a = t * 0.25;
+  boat.position.set(Math.cos(a) * 9, -0.2 + Math.sin(t * 2) * 0.05, 10.5 + Math.sin(a) * 1.5);
+  tmp2.set(-Math.sin(a) * 9, 0, Math.cos(a) * 1.5);
+  boat.rotation.y = Math.atan2(tmp2.x, tmp2.z);
+  boat.rotation.z = Math.sin(t * 1.7) * 0.05;
+
+  waves.forEach((w, i) => { w.position.x += 0.01 + i * 0.001; if (w.position.x > 13) w.position.x = -13; });
+
+  balloons.forEach(({ g, ph, r, y }, i) => {
+    const ang = t * (0.07 + i * 0.01) + ph;
+    g.position.set(Math.cos(ang) * r, y + Math.sin(t * 0.8 + ph) * 0.5, Math.sin(ang) * r * 0.8);
+    g.rotation.y = -ang;
+  });
+
+  clouds.forEach(({ g, speed }) => {
+    g.position.x += speed * 0.01;
+    if (g.position.x > 45) g.position.x = -45;
+  });
+
+  controls.update();
+  renderer.render(scene, camera);
+});
+
+function fit() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.fov = camera.aspect < 1.3 ? Math.min(32 * 1.3 / camera.aspect, 75) : 32;
+  camera.updateProjectionMatrix();
+}
+fit();
+addEventListener('resize', () => {
+  fit();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
