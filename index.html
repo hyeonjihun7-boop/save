@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three.js Animation</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05060f; }
+  #hint { position: fixed; left: 16px; bottom: 12px; color: #8890b5; font: 13px system-ui, sans-serif; pointer-events: none; }
+  #space-btn { position: fixed; right: 16px; bottom: 12px; background: #151a33; color: #cfd6ff; border: 1px solid #343c6e; border-radius: 6px; padding: 8px 14px; cursor: pointer; font: 14px system-ui, sans-serif; }
+  #space-btn:hover { background: #1f2750; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<button id="space-btn" onclick="location.href='space.html'">🚀 우주 보러 가기</button>
+<div id="hint">드래그: 회전 · 휠: 확대/축소</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x05060f, 0.025);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(0, 3, 14);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.6;
+
+// 조명
+scene.add(new THREE.AmbientLight(0x404060, 1.2));
+const lightA = new THREE.PointLight(0xff3c8e, 120, 40);
+const lightB = new THREE.PointLight(0x3cc8ff, 120, 40);
+scene.add(lightA, lightB);
+
+// 중앙 토러스 매듭
+const knot = new THREE.Mesh(
+  new THREE.TorusKnotGeometry(2, 0.6, 220, 32),
+  new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.7, roughness: 0.25 })
+);
+scene.add(knot);
+
+// 궤도를 도는 구체들
+const orbiters = [];
+const COUNT = 8;
+for (let i = 0; i < COUNT; i++) {
+  const color = new THREE.Color().setHSL(i / COUNT, 0.8, 0.6);
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(0.35, 32, 32),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.6, roughness: 0.3 })
+  );
+  scene.add(m);
+  orbiters.push({ mesh: m, radius: 5 + (i % 3) * 1.2, speed: 0.4 + i * 0.07, phase: (i / COUNT) * Math.PI * 2, tilt: i * 0.4 });
+}
+
+// 별 파티클
+const N = 2500;
+const pos = new Float32Array(N * 3);
+for (let i = 0; i < N; i++) {
+  const r = 20 + Math.random() * 60;
+  const t = Math.random() * Math.PI * 2;
+  const p = Math.acos(2 * Math.random() - 1);
+  pos[i * 3] = r * Math.sin(p) * Math.cos(t);
+  pos[i * 3 + 1] = r * Math.sin(p) * Math.sin(t);
+  pos[i * 3 + 2] = r * Math.cos(p);
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 0.15, color: 0xaab4ff, transparent: true, opacity: 0.8 }));
+scene.add(stars);
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const t = clock.getElapsedTime();
+
+  knot.rotation.x = t * 0.3;
+  knot.rotation.y = t * 0.5;
+  knot.scale.setScalar(1 + Math.sin(t * 2) * 0.05);
+
+  for (const o of orbiters) {
+    const a = t * o.speed + o.phase;
+    o.mesh.position.set(
+      Math.cos(a) * o.radius,
+      Math.sin(a * 1.5) * 2,
+      Math.sin(a) * o.radius
+    );
+    o.mesh.position.applyAxisAngle(new THREE.Vector3(1, 0, 0), o.tilt * 0.3);
+  }
+
+  lightA.position.set(Math.cos(t) * 8, Math.sin(t * 0.7) * 5, Math.sin(t) * 8);
+  lightB.position.set(-Math.cos(t * 0.8) * 8, Math.cos(t) * 5, -Math.sin(t * 0.8) * 8);
+
+  stars.rotation.y = t * 0.01;
+
+  controls.update();
+  renderer.render(scene, camera);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
