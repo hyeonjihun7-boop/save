@@ -87,6 +87,20 @@ $('#searchForm').addEventListener('submit', e => {
 });
 $('#more').addEventListener('click', () => { state.page += 1; load(false); });
 
+// 사진 로딩: 도착하면 페이드인, 실패하면 한 번 재시도 후 빈 칸 아이콘 (load/error 는 버블링되지 않아 capture 로 받는다)
+function watchImages(grid) {
+  grid.addEventListener('load', e => { if (e.target.tagName === 'IMG') e.target.classList.add('ld'); }, true);
+  grid.addEventListener('error', e => {
+    const img = e.target; if (img.tagName !== 'IMG') return;
+    if (!img.dataset.retry) {
+      img.dataset.retry = '1';
+      const src = img.getAttribute('src');
+      setTimeout(() => { img.src = src + (src.includes('?') ? '&' : '?') + 'r=1'; }, 900);
+    } else img.closest('.card')?.classList.add('err');
+  }, true);
+}
+watchImages($('#grid')); watchImages($('#favGrid'));
+
 /* ---------- 즐겨찾기 ---------- */
 function paintHearts() {
   document.querySelectorAll('[data-heart]').forEach(b => {

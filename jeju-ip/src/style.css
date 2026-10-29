@@ -78,7 +78,13 @@ button { font: inherit; cursor: pointer; }
 @media (max-width: 420px) { .grid { column-count: 1; } }
 .card { position: relative; margin: 0 0 14px; break-inside: avoid; border-radius: var(--radius); overflow: hidden; background: #ddd; cursor: zoom-in; box-shadow: 0 2px 8px rgba(30, 20, 0, .12); transition: transform .2s, box-shadow .2s; }
 .card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(30, 20, 0, .22); }
-.card img { width: 100%; height: auto; background: linear-gradient(135deg, #e8dcc3, #d8e6ee); }
+/* 사진이 도착하기 전에는 alt 글자를 숨기고 로딩 효과만 보여준다 */
+.card { min-height: 120px; background: linear-gradient(110deg, #e8dcc3 30%, #f4ecdb 50%, #e8dcc3 70%) 0 0 / 200% 100%; animation: shimmer 1.4s linear infinite; }
+.card:has(img.ld) { animation: none; background: #ddd; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.card img { width: 100%; height: auto; color: transparent; font-size: 0; opacity: 0; transition: opacity .45s; }
+.card img.ld { opacity: 1; }
+.card.err::after { content: '🖼️'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; opacity: .45; }
 .card figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 12px 10px; color: #fff; font-size: 13px; background: linear-gradient(transparent, rgba(0, 0, 0, .65)); opacity: 0; transition: opacity .2s; }
 .card:hover figcaption { opacity: 1; }
 .heart {
